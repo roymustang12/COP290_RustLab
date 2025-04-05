@@ -1,6 +1,6 @@
 
 
-use std::{cell, collections::{btree_map::Values, HashMap, HashSet, VecDeque}};
+use std::{cell, collections::{btree_map::Values, HashMap, HashSet, VecDeque}, hash::Hash};
 use crate::cell::{Cell, CellReference, Operand, Sheet, Spreadsheet};
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::mpsc::{self, Sender, Receiver};
@@ -598,3 +598,64 @@ pub fn recalculate_dependents(sheet: &mut Spreadsheet, rs: i32, cs: i32) {
     }
 }
 
+fn assign_cell(sheet: &mut Spreadsheet, rt: i32, ct: i32, operation_id:i32, formula: Vec<Operand>, ) {
+    
+    let mut temp_precedents: HashMap<CellReference, bool> = HashMap::new();
+
+    {
+        let target_cell = &mut sheet.all_cells[rt as usize][ct as usize];
+        temp_precedents = target_cell.precedents.clone();
+    }
+    //dependents of target_cell do not change
+    //precedents will be cleared
+    for (cell_ref,_) in &temp_precedents {
+        delete_dependency(sheet,cell_ref.row, cell_ref.column, rt, ct);
+    }
+    clear_precedents(sheet, rt, ct);
+    let temp_formula = formula.clone();
+    //WARNING do not change the dependents
+    sheet.all_cells[rt as usize][ct as usize].formula = formula;
+    sheet.all_cells[rt as usize][ct as usize].operation_id = operation_id;
+    for precedent in &temp_formula {
+        if let Operand::CellOperand(cell_ref) = precedent {
+            add_dependency(sheet, cell_ref.row, cell_ref.column, rt, ct);
+        }
+    }
+
+    if (!has_cycle(sheet, rt, ct)) {
+        if (!zero_div_err(sheet, rt, ct)) {
+            calculate_cell_value(sheet, rt, ct);
+            recalculate_dependents(sheet, rt, ct);
+            unsafe {
+                STATUS = 0;
+            }
+            
+        }
+        else {
+            sheet.all_cells[rt as usize][ct as usize].is_error = true;
+            unsafe {
+                STATUS = 2
+            }
+            recalculate_dependents(sheet, rt, ct);
+        }
+    }
+    else {
+        unsafe {
+            STATUS = 3;
+        }
+        sheet.all_cells[rt as usize][ct as usize].operation_id = operation_id;
+        sheet.all_cells[rt as usize][ct as usize].formula = temp_formula.clone();
+        
+        for (old_precedent,_) in &temp_precedents {
+            add_dependency(sheet, old_precedent.row, old_precedent.column, rt, ct);
+
+        }   
+        for new_precedent in &temp_formula {
+            if let Operand::CellOperand(cell_ref) = new_precedent {
+                delete_dependency(sheet, cell_ref.row, cell_ref.column, rt, ct);
+            }
+        }
+        
+    }
+   
+}
