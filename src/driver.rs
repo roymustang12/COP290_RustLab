@@ -123,6 +123,7 @@ fn main() {
         process::exit(1);
     }
 
+
     let mut sheet = dependency_graph_final::initialise(rows, columns);
 
     let mut input = String::new();
@@ -130,6 +131,14 @@ fn main() {
     let mut execution_time = 0.0;
     let mut print_flag = true;
     display_sheet(&sheet);
+
+    let mut operation_id: i32 = 0;
+    let  mut edit_row: i32 = 0;
+    let mut edit_column: i32 = 0;
+    let mut count_operands: i32 = 0;
+    let mut formula: Vec<Cell::Operand>;
+
+
 
     loop {
         unsafe {
@@ -180,9 +189,9 @@ fn main() {
                     }
                 }
                 _ => {
-                    input::parse_input(input, &mut sheet,rows,columns);
+                    input::parse_input(input, &mut sheet,rows,columns,&mut operation_id, &mut edit_row, &mut edit_column, &mut formula, &mut count_operands);
                     if dependency_graph_final::STATUS != 1 {
-                        dependency_graph_final::assign_cell(&mut sheet, input::EDIT_ROW, input::EDIT_COLUMN,input:: OPERATION_ID, input::FORMULA, input::COUNT_OPERANDS);
+                        dependency_graph_final::assign_cell(&mut sheet, edit_row, edit_column,operation_id, formula, count_operands);
                     }
                 }
             }
