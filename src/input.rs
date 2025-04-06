@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-mod dependency_graph_final;
-mod cell;
+use crate::cellsp::{CellReference, Operand};
 
 
 // #[derive(Clone)]
@@ -51,7 +48,7 @@ fn string_to_int(num_str: &str)-> i32 {
     while i < chars.len() {
         let digit = chars[i] as i32 - '0' as i32;
         if digit < 0 || digit > 9 {
-            unsafe { dependency_graph_final::STATUS = 1; }
+            unsafe { crate::dependency_graph_final::STATUS = 1; }
             break;
         }
         num = num * 10 + digit;
@@ -88,7 +85,7 @@ pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
             break;
         } else if (chars[i].to_ascii_uppercase() as i32 - 'A' as i32) >= 26 || 
                   (chars[i].to_ascii_uppercase() as i32 - 'A' as i32) < 0 {
-            unsafe { dependency_graph_final::STATUS = 1; }
+            unsafe { crate::dependency_graph_final::STATUS = 1; }
             break;
         }
         
@@ -102,7 +99,7 @@ pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
     if !contains_alphabet(row_part) && !is_arithmetic_expression(row_part) {
         *row = string_to_int(row_part) - 1;
     } else {
-        unsafe { dependency_graph_final::STATUS = 1; }
+        unsafe { crate::dependency_graph_final::STATUS = 1; }
     }
 }
 
@@ -120,41 +117,41 @@ fn assign_value(op: char) -> i32 {
         '*' => 5,
         '/' => 6,
         _ => {
-            unsafe { dependency_graph_final::STATUS = 1; }
+            unsafe { crate::dependency_graph_final::STATUS = 1; }
             0
         }
     }
 }
 
-pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i32,&operation_id : &mut i32,edit_row : &mut i32,edit_column : &mut i32,count_operands : &mut i32,formula : &mut Vec<Cell::Operand>) {
+pub fn parse_input(input: &str, spreadsheet: &mut crate::cellsp::Spreadsheet, rows: i32,cols: i32,operation_id : &mut i32,edit_row : &mut i32,edit_column : &mut i32,count_operands : &mut i32,formula : &mut Vec<Operand>) {
 
     let parts: Vec<&str> = input.split('=').collect();
     if parts.len() != 2 {
-        unsafe { dependency_graph_final::STATUS = 1; }
+        unsafe { crate::dependency_graph_final::STATUS = 1; }
         return;
     }
-    println!("  i was here");
+    // println!("  i was here");
     let cell_name = parts[0].trim();
     let expression = parts[1].trim();
     let mut edit_r = 0;
     let mut edit_col = 0;
-    parse_cell_name(cell_name, &mut edit_row, &mut edit_col);
-    if edit_row < 0 || edit_row >= rows || edit_col < 0 || edit_col >= cols {
-        unsafe { dependency_graph_final::STATUS = 1; }
+    parse_cell_name(cell_name, &mut edit_r, &mut edit_col);
+    if edit_r < 0 || edit_r >= rows || edit_col < 0 || edit_col >= cols {
+        unsafe { crate::dependency_graph_final::STATUS = 1; }
         return;
     }
-    edit_row= edit_r;
-    edit_column = edit_col; 
+    *edit_row= edit_r;
+    *edit_column = edit_col; 
 
     if expression.chars().next().map_or(false, |c| c.is_digit(10) || c == '-' || c == '+') || 
      (expression.chars().next().map_or(false, |c| c.is_alphabetic()) && !expression.contains('(')) {
      if !contains_alphabet(expression) && !is_arithmetic_expression(&expression[1..]){
-        count_operands =1;
+        *count_operands =1;
         let mut formula_vec = Vec::with_capacity(1);
-        formula_vec.push(Cell::Operand::Constant(string_to_int(expression)),
+        formula_vec.push(Operand::Constant(string_to_int(expression)),
         );
-        formula = formula_vec;
-        operation_id = 1;
+        *formula = formula_vec;
+        *operation_id = 1;
 
      }
      else if contains_alphabet(expression) && !is_arithmetic_expression(&expression[1..]){
@@ -162,18 +159,18 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
         let mut col1 =0;
         parse_cell_name(&expression, &mut row1, &mut col1);
         if row1 < 0 || row1 >= rows || col1 < 0 || col1 >= cols {
-            unsafe { dependency_graph_final::STATUS = 1; }
+            unsafe { crate::dependency_graph_final::STATUS = 1; }
             return;
         }
-        count_operands =1;
+        *count_operands =1;
         let mut formula_vec = Vec::with_capacity(1);
-        formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[row1 as usize][col1 as usize].clone()),);
-       formula = formula_vec;
-        operation_id = 2;
+        formula_vec.push(Operand::CellOperand(CellReference{row: row1 , column: col1}),);
+       *formula = formula_vec;
+        *operation_id = 2;
 
      }
      else if (contains_alphabet(expression) && is_arithmetic_expression(&expression[1..])) || (!contains_alphabet(expression) && is_arithmetic_expression(&expression[1..])){
-        count_operands =2;
+        *count_operands =2;
         let mut formula_vec = Vec::with_capacity(2);
 
         if !(expression.starts_with('+')|| expression.starts_with('-')){
@@ -185,7 +182,7 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                 let operand2 = rest;
                  
                 if operand2.is_empty(){
-                    unsafe { dependency_graph_final::STATUS =1;}
+                    unsafe { crate::dependency_graph_final::STATUS =1;}
                     return;
                 }
 
@@ -195,16 +192,16 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                     parse_cell_name(operand1,&mut r1, &mut c1);
 
                     if r1 <0 || r1 > rows || c1 <0 || c1 > cols {
-                        unsafe { dependency_graph_final::STATUS =1}
+                        unsafe { crate::dependency_graph_final::STATUS =1}
                         return;
                     }
 
-                    formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[r1 as usize][c1 as usize].clone()));
-                    operation_id = assign_value(op);
+                    formula_vec.push(Operand::CellOperand(CellReference{row: r1 , column: c1}));
+                    *operation_id = assign_value(op);
                 }
                 else {
-                    formula_vec.push(Cell::Operand::Constant(string_to_int(operand1)));
-                    operation_id = assign_value(op);
+                    formula_vec.push(Operand::Constant(string_to_int(operand1)));
+                    *operation_id = assign_value(op);
 
                 }
 
@@ -215,26 +212,26 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                     parse_cell_name(operand2, &mut r1, &mut c1);
                     
                     if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
                     
-                    formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[r1 as usize][c1 as usize].clone()));
+                    formula_vec.push(Operand::CellOperand(CellReference{row: r1 , column: c1}));
                 } else {
-                    formula_vec.push(Cell::Operand::Constant(string_to_int(operand2))
+                    formula_vec.push(Operand::Constant(string_to_int(operand2))
                     );
                 }
               } else {
-                unsafe { dependency_graph_final::STATUS =1;}
+                unsafe { crate::dependency_graph_final::STATUS =1;}
               }
-             formula = formula_vec;
+             *formula = formula_vec;
 
         }
         else if expression.starts_with('+')|| expression.starts_with('-'){
 
             // Handle expressions starting with ++... or --..
             if expression.chars().nth(1).map_or(false, |c| c == '+' || c == '-') {
-                unsafe {dependency_graph_final::STATUS = 1;}
+                unsafe {crate::dependency_graph_final::STATUS = 1;}
                 return;
             }
 
@@ -265,8 +262,8 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                     //     type_flag: 1,
                     //     operand_value: OperandValue::CellOperand(spreadsheet.all_cells[r1 as usize][c1 as usize].clone())
                     // });
-                    // unsafe {operation_id = assign_value(op);}
-                    unsafe { dependency_graph_final::STATUS =1;}
+                    // unsafe {*operation_id = assign_value(op);}
+                    unsafe { crate::dependency_graph_final::STATUS =1;}
                     return;
                 } else {
                     let mut value = string_to_int(operand1);
@@ -274,8 +271,8 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                         value *= -1;
                     }
                     
-                    formula_vec.push(Cell::Operand::Constant(value));
-                    operation_id = assign_value(op);
+                    formula_vec.push(Operand::Constant(value));
+                    *operation_id = assign_value(op);
                 }
 
                 if operand2.chars().next().map_or(false, |c| c.is_alphabetic()) {
@@ -284,44 +281,44 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                     parse_cell_name(operand2, &mut r1, &mut c1);
                     
                     if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
                     
-                    formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[r1 as usize][c1 as usize].clone()));
+                    formula_vec.push(Operand::CellOperand(CellReference{row: r1 , column: c1}));
                 } else {
-                    formula_vec.push(Cell::Operand::Constant(string_to_int(operand2)));
+                    formula_vec.push(Operand::Constant(string_to_int(operand2)));
                 }
             }
             else {
-                unsafe { dependency_graph_final::STATUS =1;}
+                unsafe { crate::dependency_graph_final::STATUS =1;}
             }
-            formula = formula_vec;
+            *formula = formula_vec;
 
         }
      }
      else {
-        unsafe { dependency_graph_final::STATUS = 1; }
+        unsafe { crate::dependency_graph_final::STATUS = 1; }
         return;
      }
     }
     else if is_function(expression) {
-        println!("i was here");
+        // println!("i was here");
         let open_paren_pos = expression.find('(');
         let close_paren_pos = expression.rfind(')');
         
         if open_paren_pos.is_none() || close_paren_pos.is_none() || 
            open_paren_pos.unwrap() > close_paren_pos.unwrap() - 1 {
-            unsafe {dependency_graph_final::STATUS = 1;}
-            println!("i entered heer 1");
+            unsafe {crate::dependency_graph_final::STATUS = 1;}
+            // println!("i entered heer 1");
         }
         
         let open_count = count_occurrences('(', expression);
         let close_count = count_occurrences(')', expression);
         
         if open_count != close_count {
-           unsafe {dependency_graph_final::STATUS = 1;}
-           println!("i entered heer 2");
+           unsafe {crate::dependency_graph_final::STATUS = 1;}
+        //    println!("i entered heer 2");
         }
 
         if let (Some(open_pos), Some(close_pos)) = (open_paren_pos, close_paren_pos){
@@ -329,8 +326,8 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
             let range = &expression[open_pos+1..close_pos];
             
             unsafe {
-                println!("i was here");
-                operation_id = match function_name {
+                // println!("i was here");
+                *operation_id = match function_name {
                 "MIN" => 7,
                 "MAX" => 8,
                 "AVG" => 9,
@@ -338,14 +335,14 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                 "STDEV" => 11,
                 "SLEEP" => 12,
                 _ => {
-                    dependency_graph_final::STATUS = 1;
+                    crate::dependency_graph_final::STATUS = 1;
                     0
                 }
             };
         }
             
             if function_name == "SLEEP" {
-                count_operands = 1;
+                *count_operands = 1;
 
                 let mut formula_vec = Vec::with_capacity(1);
                 
@@ -355,16 +352,16 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
                     parse_cell_name(range, &mut r3, &mut c3);
                     
                     if r3 < 0 || r3 > rows || c3 < 0 || c3 > cols {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
                     
-                    formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[r3 as usize][c3 as usize].clone()));
+                    formula_vec.push(Operand::CellOperand(CellReference{row: r3 , column: c3}));
                 } else {
-                    formula_vec.push(Cell::Operand ::Constant(string_to_int(range)));
+                    formula_vec.push(Operand ::Constant(string_to_int(range)));
                 }
                 
-                formula = formula_vec;
+                *formula = formula_vec;
             } else {
                 // Handle range functions (MIN, MAX, AVG, SUM, STDEV)
                 let range_parts: Vec<&str> = range.split(':').collect();
@@ -384,47 +381,47 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
 
            
                     if r3 < 0 || r3 > rows || c3 < 0 || c3 > cols {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
                     
                     parse_cell_name(end, &mut r4, &mut c4);
                     if r4 < 0 || r4 > rows || c4 < 0 || c4 > cols {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
                     
                     if r3 > r4 || c3 > c4 {
-                        unsafe {dependency_graph_final::STATUS = 1;}
+                        unsafe {crate::dependency_graph_final::STATUS = 1;}
                         return;
                     }
 
                     let numbers = (r4 - r3 + 1) * (c4 - c3 + 1);
                     
-                    count_operands = (r4 - r3 + 1) * (c4 - c3 + 1);
+                    *count_operands = (r4 - r3 + 1) * (c4 - c3 + 1);
                     let mut formula_vec = Vec::with_capacity(numbers as usize);
                     
                     for i in r3..=r4 {
                         for j in c3..=c4 {
-                            formula_vec.push(Cell::Operand::CellOperand(spreadsheet.all_cells[i as usize][j as usize].clone()));
+                            formula_vec.push(Operand::CellOperand(CellReference{row: i , column: j}));
                         }
                     }
                     
-                    formula = formula_vec;
+                    *formula = formula_vec;
                 } else {
-                    unsafe {dependency_graph_final::STATUS = 1;}
-                    println!("i was here 4");
+                    unsafe {crate::dependency_graph_final::STATUS = 1;}
+                    // println!("i was here 4");
                 }
             }
         }
         else {
-            unsafe { dependency_graph_final::STATUS =1 ;}
-            println!("i was here 5");
+            unsafe { crate::dependency_graph_final::STATUS =1 ;}
+            // println!("i was here 5");
         }
     }
     else {
-        unsafe {dependency_graph_final::STATUS =1;}
-        println!("i was here 6");
+        unsafe {crate::dependency_graph_final::STATUS =1;}
+        // println!("i was here 6");
     }
 
 }
@@ -475,9 +472,9 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
 //         // Reset global variables
 //         unsafe {
 //             dependency_graph_final::STATUS = 0;
-//             operation_id = 0;
-//             count_operands = 0;
-//             formula = None;
+//             *operation_id = 0;
+//             *count_operands = 0;
+//             *formula = None;
 //         }
 
 //         // Parse the input
@@ -486,12 +483,12 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
 //         // Print the results
 //         unsafe {
 //             println!("dependency_graph_final::STATUS: {}", dependency_graph_final::STATUS);
-//             println!("operation_id: {}", operation_id);
-//             println!("count_operands: {}", count_operands);
+//             println!("*operation_id: {}", *operation_id);
+//             println!("*count_operands: {}", *count_operands);
 
-//             if let Some(formula) = &formula {
-//                 println!("formula:");
-//                 for operand in formula {
+//             if let Some(*formula) = &*formula {
+//                 println!("*formula:");
+//                 for operand in *formula {
 //                     match &operand.operand_value {
 //                         OperandValue::Constant(value) => {
 //                             println!("  Type: Constant, Value: {}", value);
@@ -502,7 +499,7 @@ pub fn parse_input(input: &str, spreadsheet: &mut Cell::Sheet, rows: i32,cols: i
 //                     }
 //                 }
 //             } else {
-//                 println!("formula: None");
+//                 println!("*formula: None");
 //             }
 //         }
 
