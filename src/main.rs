@@ -183,10 +183,32 @@ fn main() {
                 "q" => break,
                 "disable_output" => print_flag = false,
                 "enable_output" => print_flag = true,
-                "w" => CURRENT_ROW = CURRENT_ROW.saturating_sub(10),
-                "s" => CURRENT_ROW = min(CURRENT_ROW + 10, rows.saturating_sub(10)),
-                "a" => CURRENT_COL = CURRENT_COL.saturating_sub(10),
-                "d" => CURRENT_COL = min(CURRENT_COL + 10, columns.saturating_sub(10)),
+                "w" =>if(CURRENT_ROW -10 < 0){CURRENT_ROW=0;}else{CURRENT_ROW = CURRENT_ROW - 10;},
+                "s" => 
+                    if(CURRENT_ROW+10 >rows){
+                        CURRENT_ROW=CURRENT_ROW;
+                    }
+                    else if(CURRENT_ROW+20>rows){
+                        CURRENT_ROW=rows-10;
+                    }
+                    else{
+                        CURRENT_ROW=CURRENT_ROW+10;
+                    },
+                "a" =>  if(CURRENT_COL-10 < 0){
+                            CURRENT_COL=0;
+                        }
+                        else{
+                            CURRENT_COL=CURRENT_COL-10;
+                        },
+                "d" => if(CURRENT_COL+10 >columns){
+                            CURRENT_COL=CURRENT_COL;
+                        }
+                        else if(CURRENT_COL+20>columns){
+                            CURRENT_COL=columns-10;
+                        }
+                        else{
+                            CURRENT_COL=CURRENT_COL+10;
+                        },
                 _ if input.starts_with("scroll_to ") => {
                     let mut new_row=0;
                     let mut new_col =0;
