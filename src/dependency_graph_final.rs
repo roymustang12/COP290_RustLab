@@ -1,5 +1,3 @@
-
-
 use std::{cell, collections::{btree_map::Values, HashMap, HashSet, VecDeque}, hash::Hash};
 use crate::cell::{Cell, CellReference, Operand, Sheet, Spreadsheet};
 use std::sync::{Arc, Mutex, Condvar};
@@ -15,7 +13,7 @@ lazy_static! {
     };
 }
 
-static mut STATUS: i32 = 0;
+pub static mut STATUS: i32 = 0;
 
 pub fn initialise(rows: i32, columns: i32) -> Spreadsheet {
     let mut all_cells = Vec::with_capacity(rows as usize);
