@@ -82,7 +82,7 @@ fn display_sheet(sheet: &Spreadsheet) {
             print!("{:3}", r + 1);
             for c in CURRENT_COL..min(CURRENT_COL + VIEWPORT_SIZE, sheet.columns as i32) {
                 if sheet.all_cells[r as usize][c as usize].is_error {
-                    print!("{:9}", "ERR");
+                    print!("{:^9}", "ERR");
                 } else {
                     print!("{:9}", sheet.all_cells[r as usize][c as usize].value);
                 }
