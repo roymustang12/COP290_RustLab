@@ -1,18 +1,18 @@
-use std::io::{self, Write};
-use std::time::Instant;
-use std::process;
-use std::ffi::CString;
-use std::ptr;
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::ffi::CString;
+use std::io::{self, Write};
+use std::process;
+use std::ptr;
+use std::time::Instant;
 
-use rust_lab::cellsp::Spreadsheet;
-use rust_lab::dependency_graph_final::initialise;
 use rust_lab::cellsp::Operand;
+use rust_lab::cellsp::Spreadsheet;
+use rust_lab::dependency_graph_final::assign_cell;
+use rust_lab::dependency_graph_final::initialise;
 use rust_lab::dependency_graph_final::STATUS;
 use rust_lab::input::parse_cell_name;
 use rust_lab::input::parse_input;
-use rust_lab::dependency_graph_final::assign_cell;
 
 const MAX_ROWS: i32 = 999;
 const MAX_COLS: i32 = 18278;
@@ -129,7 +129,6 @@ fn main() {
         process::exit(1);
     }
 
-
     let mut sheet = initialise(rows as i32, columns as i32);
 
     let mut input = String::new();
@@ -144,11 +143,9 @@ fn main() {
     // let mut count_operands: i32 = 0;
     // let mut formula: Vec<Operand> = vec![];
 
-
-
     loop {
         let mut operation_id: i32 = 0;
-        let  mut edit_row: i32 = 0;
+        let mut edit_row: i32 = 0;
         let mut edit_column: i32 = 0;
         let mut count_operands: i32 = 0;
         let mut formula: Vec<Operand> = vec![];
@@ -210,23 +207,32 @@ fn main() {
                             CURRENT_COL=CURRENT_COL+10;
                         },
                 _ if input.starts_with("scroll_to ") => {
-                    let mut new_row=0;
-                    let mut new_col =0;
-                    parse_cell_name(&input[10..],&mut new_row,&mut new_col);
-                        if new_row < rows && new_col < columns {
-                            CURRENT_ROW = new_row;
-                            CURRENT_COL = new_col;
-                            DISPLAY_ROW = 0;
-                            DISPLAY_COLUMN = 0;
-                        } else {
-                            eprintln!("Out of bounds rows or columns");
-                        }
-                    
+                    let mut new_row = 0;
+                    let mut new_col = 0;
+                    parse_cell_name(&input[10..], &mut new_row, &mut new_col);
+                    if new_row < rows && new_col < columns {
+                        CURRENT_ROW = new_row;
+                        CURRENT_COL = new_col;
+                        DISPLAY_ROW = 0;
+                        DISPLAY_COLUMN = 0;
+                    } else {
+                        eprintln!("Out of bounds rows or columns");
+                    }
                 }
                 _ => {
-                    parse_input(input, &mut sheet,rows,columns,&mut operation_id, &mut edit_row, &mut edit_column, &mut count_operands, &mut formula);
+                    parse_input(
+                        input,
+                        &mut sheet,
+                        rows,
+                        columns,
+                        &mut operation_id,
+                        &mut edit_row,
+                        &mut edit_column,
+                        &mut count_operands,
+                        &mut formula,
+                    );
                     if STATUS != 1 {
-                        assign_cell(&mut sheet, edit_row, edit_column,operation_id, formula);
+                        assign_cell(&mut sheet, edit_row, edit_column, operation_id, formula);
                     }
                 }
             }

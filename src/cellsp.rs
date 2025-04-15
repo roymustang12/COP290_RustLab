@@ -6,7 +6,7 @@ pub enum Operand {
     CellOperand(CellReference),
 }
 
-#[derive(Eq, Hash, PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct CellReference {
     pub row: i32,
     pub column: i32,

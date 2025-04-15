@@ -1,0 +1,82 @@
+use std::str::FromStr;
+use crate::expression_parser::Expr;
+use crate::cellsp::CellReference;
+
+grammar;
+
+pub Formula: Box<Expr> = {
+    <e:Expr> => Box::new(e),
+};
+
+Expr: Expr = {
+    <l:Expr> "+" <r:Term> => Expr::BinaryOp(Box::new(l), '+', Box::new(r)),
+    <l:Expr> "-" <r:Term> => Expr::BinaryOp(Box::new(l), '-', Box::new(r)),
+    Term,
+};
+
+Term: Expr = {
+    <l:Term> "*" <r:Factor> => Expr::BinaryOp(Box::new(l), '*', Box::new(r)),
+    <l:Term> "/" <r:Factor> => Expr::BinaryOp(Box::new(l), '/', Box::new(r)),
+    Factor,
+};
+
+Factor: Expr = {
+    <n:Number> => Expr::Number(n),
+    <c:CellRef> => Expr::Cell(c),
+    <f:FunctionCall> => f,
+    <r:Range> => r,
+    "(" <e:Expr> ")" => e,
+};
+
+FunctionCall: Expr = {
+    <name:FunctionName> "(" <args:ExprList> ")" => {
+        Expr::Function(name, args)
+    },
+};
+
+ExprList: Vec<Expr> = {
+    <v:(<Expr> ",")*> <e:Expr?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
+Range: Expr = {
+    <start:CellRef> ":" <end:CellRef> => Expr::Range(start, end),
+};
+
+CellRef: CellReference = {
+    <col:Column> <row:Number> => {
+        CellReference {
+            row: row - 1, // Adjusting to 0-based indexing
+            column: col,
+        }
+    },
+};
+
+Column: i32 = {
+    <s:r"[A-Z]+"> => {
+        let mut col = 0;
+        for c in s.chars() {
+            col = col * 26 + ((c.to_ascii_uppercase() as i32) - ('A' as i32) + 1);
+        }
+        col - 1 // Convert to 0-based indexing
+    },
+};
+
+Number: i32 = {
+    <s:r"[0-9]+"> => i32::from_str(s).unwrap(),
+};
+
+FunctionName: String = {
+    "Sum" => "SUM".to_string(),
+    "Min" => "MIN".to_string(),
+    "Max" => "MAX".to_string(),
+    "Avg" => "AVG".to_string(),
+    "Stdev" => "STDEV".to_string(),
+    "Sleep" => "SLEEP".to_string(),
+};

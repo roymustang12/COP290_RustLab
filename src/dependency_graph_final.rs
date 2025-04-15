@@ -582,7 +582,8 @@ pub fn dfs_cycle_detection(
         }
     }
 
-    recursion_stack.remove(&cell_coord);
+    recursion_stack.remove(&cell_coord);                                        
+    
 
     false
 }
