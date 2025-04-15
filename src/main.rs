@@ -72,9 +72,9 @@ fn get_col_label(col: i32) -> String {
 
 fn display_sheet(sheet: &Spreadsheet) {
     unsafe {
-        print!("           ");
+        print!("   ");
         for c in CURRENT_COL..min(CURRENT_COL + VIEWPORT_SIZE, sheet.columns as i32) {
-            print!("{:9}", get_col_label(c));
+            print!("{:^9}", get_col_label(c));
         }
         println!();
 
@@ -84,7 +84,7 @@ fn display_sheet(sheet: &Spreadsheet) {
                 if sheet.all_cells[r as usize][c as usize].is_error {
                     print!("{:^9}", "ERR");
                 } else {
-                    print!("{:9}", sheet.all_cells[r as usize][c as usize].value);
+                    print!("{:^9}", sheet.all_cells[r as usize][c as usize].value);
                 }
             }
             println!();
