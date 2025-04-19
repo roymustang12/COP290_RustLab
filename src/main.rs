@@ -22,6 +22,7 @@ use rust_lab::graph_extension::assign_cell_extension;
 use rust_lab::graph_extension::initialise_extension;
 use rust_lab::graph_extension::STATUS_extension;
 use rust_lab::parser_visual_mode::parser_visual;
+use rust_lab::read_mode::handle_read_command;
 
 
 const MAX_ROWS: i32 = 999;
@@ -41,6 +42,7 @@ enum ModeOfSpreadsheet {
     NORMAL,
     INSERT,
     VISUAL,
+    READ,
 }
 
 
@@ -184,6 +186,7 @@ fn main() {
 
             match input {
                 "q" => break,
+                "read" => CURRENT_MODE = ModeOfSpreadsheet::READ,
                 "insert" => CURRENT_MODE = ModeOfSpreadsheet::INSERT,
                 "normal" => CURRENT_MODE = ModeOfSpreadsheet::NORMAL,
                 "visual" => CURRENT_MODE = ModeOfSpreadsheet::VISUAL,
@@ -230,7 +233,9 @@ fn main() {
                 }
                 _ => 
                     match CURRENT_MODE {
-                        ModeOfSpreadsheet::NORMAL => parser_normal(input, rows, columns),
+                        ModeOfSpreadsheet::READ => {handle_read_command( input, &mut sheet);},
+
+                        ModeOfSpreadsheet::NORMAL => {parser_normal(input, rows, columns);},
 
                         ModeOfSpreadsheet::INSERT => {
                             // Call parse_input and assign_cell_extension for INSERT mode
