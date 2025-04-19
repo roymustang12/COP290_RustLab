@@ -536,11 +536,7 @@ pub fn precedent_has_error(sheet: &Spreadsheet, rt: i32, ct: i32) -> bool {
     let precedents = &sheet.all_cells[rt as usize][ct as usize].precedents;
     let mut i = 0;
     for cell in precedents {
-        let (_, err) = get_operand_value(
-            sheet,
-            &sheet.all_cells[cell.0.row as usize][cell.0.column as usize].formula[i],
-        );
-        i = i + 1;
+       let err = sheet.all_cells[cell.0.row as usize][cell.0.column as usize].is_error;
         if err {
             return true;
         } else {

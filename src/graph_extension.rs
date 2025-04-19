@@ -404,7 +404,8 @@ pub fn assign_cell_extension(
         for new_precedent in &new_precedents {
             delete_dependency_extension(sheet, new_precedent.row, new_precedent.column, rt, ct);
         }
-        
+
     }
 
 }
+

@@ -116,6 +116,7 @@ fn display_sheet(sheet: &SpreadsheetExtension, shared_data: &Arc<Mutex<Vec<Vec<S
 
 
 fn main() {
+    
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
         eprintln!("Out of bounds rows or columns");
