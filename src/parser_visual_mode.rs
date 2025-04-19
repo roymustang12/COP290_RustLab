@@ -1,3 +1,4 @@
+use crate::forecast::{self, forecast};
 use crate::graph_extension::assign_cell_extension;
 use crate::cell_extension::SpreadsheetExtension;
 use crate::graph_extension::STATUS_extension;
@@ -406,6 +407,69 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 if let Err(e) = plot_scatter(&x_data, &y_data, parts[3]) {
                     eprintln!("Error generating scatter plot: {}", e);
                 }
+            }
+
+            "forecast" => {
+                let forecast_len = string_to_int(parts[1]);
+
+                let mut x_start_row = 0;
+                let mut x_start_col = 0;
+                let mut x_end_row = 0;
+                let mut x_end_col = 0;
+
+                let mut y_start_row = 0;
+                let mut y_start_col = 0;
+                let mut y_end_row = 0;
+                let mut y_end_col = 0;
+
+                parse_cell_name(parts[2].split(':').next().unwrap(), &mut x_start_row, &mut x_start_col);
+                parse_cell_name(parts[2].split(':').nth(1).unwrap(), &mut x_end_row, &mut x_end_col);
+
+                parse_cell_name(parts[3].split(':').next().unwrap(), &mut y_start_row, &mut y_start_col);
+                parse_cell_name(parts[3].split(':').nth(1).unwrap(), &mut y_end_row, &mut y_end_col);
+
+                let mut x_data = Vec::new();
+                let mut y_data = Vec::new();
+
+                for r in x_start_row..=x_end_row {
+                    for c in x_start_col..=x_end_col {
+                        x_data.push(sheet.all_cells[r as usize][c as usize].value as f64);
+                    }
+                }
+
+                for r in y_start_row..=y_end_row {
+                    for c in y_start_col..=y_end_col {
+                        y_data.push(sheet.all_cells[r as usize][c as usize].value as f64);
+                    }
+                }
+
+                let temp_x = x_data.clone();
+                let temp_y = y_data.clone();
+                let common_diff = &x_data[0] - &x_data[1];
+                let mut next_x = x_data[x_data.len() - 1].clone();
+
+                for i in 0..forecast_len{
+                    next_x = next_x + common_diff;
+                    let next_y = forecast(next_x, &temp_x, &temp_y);
+                    x_data.push(next_x);
+                    y_data.push(next_y);
+                }   
+
+
+                if x_data.len() != y_data.len() {
+                    eprintln!("x and y data must be the same length");
+                    STATUS_extension = 1;
+                    return;
+                }
+
+                if let Err(e) = plot_scatter(&x_data, &y_data, parts[3]) {
+                    eprintln!("Error generating scatter plot: {}", e);
+                }
+
+
+
+
+
             }
 
             _ => {

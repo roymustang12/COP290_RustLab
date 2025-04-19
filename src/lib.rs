@@ -8,3 +8,4 @@ pub mod display;
 pub mod parser_visual_mode;
 pub mod plot_graph;
 pub mod read_mode;
+pub mod forecast;

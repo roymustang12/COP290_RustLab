@@ -1,4 +1,4 @@
-use plotters::prelude::*;
+use crate::plotters::prelude::*;
 
 pub fn plot_scatter(x: &[f64], y: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     if x.len() != y.len() {
