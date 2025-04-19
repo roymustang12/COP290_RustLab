@@ -18,8 +18,10 @@ pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension) -> Result
     let file = File::open(path)?;
     
     
+    // Explicitly set has_headers to false to ensure first row is processed as data
     let mut rdr = csv::ReaderBuilder::new()
-        .flexible(true)  // Allow rows with different lengths
+        .has_headers(false)  // <-- Add this line to prevent skipping first row
+        .flexible(true)      // Allow rows with different lengths
         .trim(csv::Trim::All)  // Trim whitespace
         .from_reader(file);
     
