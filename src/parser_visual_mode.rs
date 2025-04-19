@@ -56,7 +56,7 @@ pub fn string_to_int(num_str: &str) -> i32 {
     }
     while i < chars.len() {
         let digit = chars[i] as i32 - '0' as i32;
-        if digit < 0 || digit > 9 {
+        if !(0..=9).contains(&digit) {
             unsafe {
                 STATUS_extension = 1;
             }
@@ -94,7 +94,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
 
                 let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
                 let value2 = "0";
-                if let Ok(parsed_formula) = parse_formula(&value2) {
+                if let Ok(parsed_formula) = parse_formula(value2) {
                     assign_cell_extension(sheet, start_row, start_col, *parsed_formula);
                 }
                 

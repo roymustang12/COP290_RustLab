@@ -1,6 +1,6 @@
 use plotters::prelude::*;
-use plotters::style::{BLACK, BLUE, RED, WHITE};
-use plotters::coord::types::RangedCoordf64;
+use plotters::style::{ BLUE, RED, WHITE};
+
 
 /// Helper to generate cell names like A1, A2, ..., from index
 fn generate_cell_names(start_row: usize, col: usize, count: usize) -> Vec<String> {
