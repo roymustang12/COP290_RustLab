@@ -410,6 +410,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
             }
 
             "forecast" => {
+                println!("enterde into foreacst");
                 let forecast_len = string_to_int(parts[1]);
 
                 let mut x_start_row = 0;
@@ -445,30 +446,32 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
 
                 let temp_x = x_data.clone();
                 let temp_y = y_data.clone();
-                let common_diff = &x_data[0] - &x_data[1];
+                let common_diff = &x_data[1] - &x_data[0];
                 let mut next_x = x_data[x_data.len() - 1].clone();
 
-                for i in 0..forecast_len{
+                for i in 0..forecast_len {
+                    println!("Iteration: {}", i);
                     next_x = next_x + common_diff;
-                    let next_y = forecast(next_x, &temp_x, &temp_y);
+                    let next_y = ((forecast(next_x, &temp_x, &temp_y)) as i32) as f64;
                     x_data.push(next_x);
                     y_data.push(next_y);
                 }   
 
+                println!("entered into second stage");
 
                 if x_data.len() != y_data.len() {
-                    eprintln!("x and y data must be the same length");
+                    println!("x and y data must be the same length");
                     STATUS_extension = 1;
                     return;
                 }
 
-                if let Err(e) = plot_scatter(&x_data, &y_data, parts[3]) {
-                    eprintln!("Error generating scatter plot: {}", e);
+                println!("{:?}", x_data);
+                println!("{:?}", y_data);
+
+                if let Err(e) = plot_scatter(&x_data, &y_data, parts[4]) {
+                    println!("chud gaye");
+                    println!("Error generating scatter plot: {}", e);
                 }
-
-
-
-
 
             }
 

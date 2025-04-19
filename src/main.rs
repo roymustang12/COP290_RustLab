@@ -102,10 +102,23 @@ fn display_sheet(sheet: &SpreadsheetExtension, shared_data: &Arc<Mutex<Vec<Vec<S
             let mut row_vec = vec![format!("{:3}", r + 1)];
             for c in CURRENT_COL..min(CURRENT_COL + VIEWPORT_SIZE, sheet.columns as i32) {
                 let cell = &sheet.all_cells[r as usize][c as usize];
+                let mut cell_display = format!("{:9}", cell.value);
+
+                if cell.is_bold && cell.is_italics {
+                    cell_display = format!("~{}~", cell_display); // Underline
+                }
+                else if cell.is_bold {
+                    cell_display = format!("*{}*", cell_display); // Bold
+                }
+                else if cell.is_italics {
+                    cell_display = format!("_{}_", cell_display); // Italics
+                }
+            
+
                 if cell.is_error {
                     row_vec.push("ERR".to_string());
                 } else {
-                    row_vec.push(format!("{:9}", cell.value));
+                    row_vec.push(cell_display);
                 }
             }
             output.push(row_vec);
@@ -115,7 +128,6 @@ fn display_sheet(sheet: &SpreadsheetExtension, shared_data: &Arc<Mutex<Vec<Vec<S
     let mut data = shared_data.lock().unwrap();
     *data = output;
 }
-
 
 fn main() {
     
