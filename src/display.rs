@@ -34,7 +34,7 @@ pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
             }
             frames.push(row_frames);
         }
-
+        
         wind.end();
         wind.show();
 
