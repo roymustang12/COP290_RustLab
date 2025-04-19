@@ -410,7 +410,6 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
             }
 
             "forecast" => {
-                println!("enterde into foreacst");
                 let forecast_len = string_to_int(parts[1]);
 
                 let mut x_start_row = 0;

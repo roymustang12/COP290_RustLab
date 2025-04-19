@@ -161,7 +161,7 @@ fn main() {
     let mut print_flag = true;
     
     let shared_data = Arc::new(Mutex::new(Vec::new()));
-    rust_lab::display::launch_gui(shared_data.clone());
+    // rust_lab::display::launch_gui(shared_data.clone());
     display_sheet(&sheet, &shared_data);
     loop {
         // let mut operation_id: i32 = 0;
