@@ -2,7 +2,7 @@ use crate::graph_extension::assign_cell_extension;
 use crate::cell_extension::SpreadsheetExtension;
 use crate::graph_extension::STATUS_extension;
 use crate::expression_utils::parse_formula;
-use crate::plot_graph::plot_histogram;
+use crate::plot_graph::{plot_histogram, plot_line, plot_scatter};
 
 
 
@@ -259,8 +259,87 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                     eprintln!("Error generating histogram: {}", e);
                 }
             }
-            _ =>  {STATUS_extension= 1;}
+
+            "plot_line" => {
+                if parts.len() != 3 {
+                    eprintln!("Invalid format. Expected: plot_line <range> <filename>");
+                    STATUS_extension = 1;
+                    return;
+                }
+
+                let mut start_row = 0;
+                let mut start_col = 0;
+                let mut end_row = 0;
+                let mut end_col = 0;
+
+                parse_cell_name(parts[1].split(':').next().unwrap(), &mut start_row, &mut start_col);
+                parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut end_row, &mut end_col);
+
+                let mut data = Vec::new();
+                for r in start_row..=end_row {
+                    for c in start_col..=end_col {
+                        let value = sheet.all_cells[r as usize][c as usize].value as f64;
+                        data.push(value);
+                    }
+                }
+
+                if let Err(e) = plot_line(&data, parts[2]) {
+                    eprintln!("Error generating line plot: {}", e);
+                }
+            }
+
+            "plot_scatter" => {
+                if parts.len() != 4 {
+                    eprintln!("Invalid format. Expected: plot_scatter <x_range> <y_range> <filename>");
+                    STATUS_extension = 1;
+                    return;
+                }
+
+                let mut x_start_row = 0;
+                let mut x_start_col = 0;
+                let mut x_end_row = 0;
+                let mut x_end_col = 0;
+
+                let mut y_start_row = 0;
+                let mut y_start_col = 0;
+                let mut y_end_row = 0;
+                let mut y_end_col = 0;
+
+                parse_cell_name(parts[1].split(':').next().unwrap(), &mut x_start_row, &mut x_start_col);
+                parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut x_end_row, &mut x_end_col);
+
+                parse_cell_name(parts[2].split(':').next().unwrap(), &mut y_start_row, &mut y_start_col);
+                parse_cell_name(parts[2].split(':').nth(1).unwrap(), &mut y_end_row, &mut y_end_col);
+
+                let mut x_data = Vec::new();
+                let mut y_data = Vec::new();
+
+                for r in x_start_row..=x_end_row {
+                    for c in x_start_col..=x_end_col {
+                        x_data.push(sheet.all_cells[r as usize][c as usize].value as f64);
+                    }
+                }
+
+                for r in y_start_row..=y_end_row {
+                    for c in y_start_col..=y_end_col {
+                        y_data.push(sheet.all_cells[r as usize][c as usize].value as f64);
+                    }
+                }
+
+                if x_data.len() != y_data.len() {
+                    eprintln!("x and y data must be the same length");
+                    STATUS_extension = 1;
+                    return;
+                }
+
+                if let Err(e) = plot_scatter(&x_data, &y_data, parts[3]) {
+                    eprintln!("Error generating scatter plot: {}", e);
+                }
+            }
+
+            _ => {
+                STATUS_extension = 1;
+            }
         }
     }
 }
-
