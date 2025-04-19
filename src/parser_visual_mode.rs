@@ -56,7 +56,7 @@ pub fn string_to_int(num_str: &str) -> i32 {
     }
     while i < chars.len() {
         let digit = chars[i] as i32 - '0' as i32;
-        if !(0..=9).contains(&digit) {
+        if digit < 0 || digit > 9 {
             unsafe {
                 STATUS_extension = 1;
             }
@@ -80,6 +80,77 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
         }
 
         match parts[0] {
+            "filter" => {
+                        if parts.len() != 4 {
+                            eprintln!("Invalid format. Expected: filter <range> <comparator> <value>");
+                            STATUS_extension = 1;
+                            return;
+                        }
+
+                        let mut start_row = 0;
+                        let mut start_col = 0;
+                        let mut end_row = 0;
+                        let mut end_col = 0;
+
+                        // Parse range
+                        parse_cell_name(parts[1].split(':').next().unwrap(), &mut start_row, &mut start_col);
+                        parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut end_row, &mut end_col);
+
+                        // Extract comparator and value
+                        let comparator = parts[2];
+                        let value: f64 = match parts[3].parse() {
+                            Ok(v) => v,
+                            Err(_) => {
+                                eprintln!("Invalid value for filter condition");
+                                STATUS_extension = 1;
+                                return;
+                            }
+                        };
+
+                        // Vector to store filtered results
+                        let mut filtered_cells: Vec<(String, f64)> = Vec::new();
+
+                        // Traverse the range and apply the filter
+                        for r in start_row..=end_row {
+                            for c in start_col..=end_col {
+                                let cell_value = sheet.all_cells[r as usize][c as usize].value as f64;
+
+                                // Apply the comparator
+                                let condition_met = match comparator {
+                                    ">" => cell_value > value,
+                                    "<" => cell_value < value,
+                                    ">=" => cell_value >= value,
+                                    "<=" => cell_value <= value,
+                                    "=" => cell_value == value,
+                                    _ => {
+                                        eprintln!("Invalid comparator. Expected one of: >, <, >=, <=, =");
+                                        STATUS_extension = 1;
+                                        return;
+                                    }
+                                };
+
+                                // If the condition is met, add the cell to the result
+                                if condition_met {
+                                    let cell_name = format!(
+                                        "{}{}",
+                                        (b'A' + c as u8) as char, // Convert column index to letter
+                                        r + 1                     // Convert row index to 1-based
+                                    );
+                                    filtered_cells.push((cell_name, cell_value));
+                                }
+                            }
+                        }
+
+                        // Print the filtered results
+                        if filtered_cells.is_empty() {
+                            println!("No cells match the filter condition");
+                        } else {
+                            println!("Filtered cells:");
+                            for (cell_name, cell_value) in filtered_cells {
+                                println!("{}: {}", cell_name, cell_value);
+                            }
+                        }
+                    }
             "dc" => {         //cut cell
                 if parts.len() != 3 {
                     STATUS_extension= 1;
@@ -94,7 +165,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
 
                 let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
                 let value2 = "0";
-                if let Ok(parsed_formula) = parse_formula(value2) {
+                if let Ok(parsed_formula) = parse_formula(&value2) {
                     assign_cell_extension(sheet, start_row, start_col, *parsed_formula);
                 }
                 
