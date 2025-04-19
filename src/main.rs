@@ -1,18 +1,28 @@
-use std::cmp::{max, min};
-use std::collections::HashMap;
-use std::ffi::CString;
 use std::io::{self, Write};
-use std::process;
-use std::ptr;
 use std::time::Instant;
+use std::process;
+use std::ffi::CString;
+use std::ptr;
+use std::cmp::{min, max};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-use rust_lab::cellsp::Operand;
-use rust_lab::cellsp::Spreadsheet;
-use rust_lab::dependency_graph_final::assign_cell;
-use rust_lab::dependency_graph_final::initialise;
-use rust_lab::dependency_graph_final::STATUS;
-use rust_lab::input::parse_cell_name;
-use rust_lab::input::parse_input;
+// use rust_lab::cellsp::Operand;
+// use rust_lab::cellsp::Spreadsheet;
+use rust_lab::cell_extension::SpreadsheetExtension;
+// use rust_lab::dependency_graph_final::assign_cell;
+// use rust_lab::dependency_graph_final::initialise;
+// use rust_lab::dependency_graph_final::STATUS;
+use rust_lab::parser_visual_mode::parse_cell_name;
+use rust_lab::parser_visual_mode::string_to_int;
+// use rust_lab::input::parse_input;
+use rust_lab::expression_utils::parse_formula;
+use rust_lab::expression_parser::Expr;
+use rust_lab::graph_extension::assign_cell_extension;
+use rust_lab::graph_extension::initialise_extension;
+use rust_lab::graph_extension::STATUS_extension;
+use rust_lab::parser_visual_mode::parser_visual;
+
 
 const MAX_ROWS: i32 = 999;
 const MAX_COLS: i32 = 18278;
@@ -23,41 +33,47 @@ static mut CURRENT_COL: i32 = 0;
 static mut DISPLAY_CELL: i32 = 0;
 static mut DISPLAY_ROW: i32 = 0;
 static mut DISPLAY_COLUMN: i32 = 0;
-// static mut STATUS: i32 = 0;
-// static mut EDIT_ROW: usize = 0;
-// static mut EDIT_COLUMN: usize = 0;
-// static mut OPERATION_ID: i32 = 0;
-// static mut FORMULA: Vec<Operand> = Vec::new();
-// static mut COUNT_OPERANDS: usize = 0;
+static mut CURRENT_MODE: ModeOfSpreadsheet = ModeOfSpreadsheet::INSERT;
 
-// #[derive(Clone)]
-// pub struct Operand {
-//     // Define the Operand structure based on your C code
-// }
 
-// pub struct Cell {
-//     value: i32,
-//     is_error: bool,
-//     // Add other fields as per your C struct
-// }
 
-// pub struct Sheet {
-//     rows: usize,
-//     columns: usize,
-//     all_cells: Vec<Vec<Cell>>,
-// }
+enum ModeOfSpreadsheet {
+    NORMAL,
+    INSERT,
+    VISUAL,
+}
 
-// impl Sheet {
-//     fn new(rows: usize, columns: usize) -> Self {
-//         let cell = Cell {
-//             value: 0,
-//             is_error: false,
-//             // Initialize other fields as necessary
-//         };
-//         let all_cells = vec![vec![cell; columns]; rows];
-//         Sheet { rows, columns, all_cells }
-//     }
-// }
+
+
+
+fn parser_normal(input: &str, rows: i32, cols: i32) {
+    unsafe {
+        let mut count = 1;
+        let mut command = input;
+
+        // Split the input into numeric prefix and the rest of the string
+        let split_index = input.find(|c: char| !c.is_digit(10)).unwrap_or(0);
+        let (num, cmd) = input.split_at(split_index);
+
+        if !num.is_empty() {
+            count = num.parse::<i32>().unwrap_or(1);
+        }
+        command = cmd;
+
+        match command {
+            "h" => CURRENT_COL = max(0, CURRENT_COL - count),
+            "l" => CURRENT_COL = min(cols - 1, CURRENT_COL + count),
+            "k" => CURRENT_ROW = max(0, CURRENT_ROW - count),
+            "j" => CURRENT_ROW = min(rows - 1, CURRENT_ROW + count),
+            "gg" => CURRENT_ROW = 0, // Go to the first row
+            "G" => CURRENT_ROW = rows - 1, // Go to the last row
+            _ => return,
+        }
+    }
+}
+
+
+
 
 fn get_col_label(col: i32) -> String {
     let mut col = col + 1; // 1-based index
@@ -70,42 +86,34 @@ fn get_col_label(col: i32) -> String {
     label.chars().rev().collect()
 }
 
-fn display_sheet(sheet: &Spreadsheet) {
+fn display_sheet(sheet: &SpreadsheetExtension, shared_data: &Arc<Mutex<Vec<Vec<String>>>>) {
+    let mut output: Vec<Vec<String>> = Vec::new();
+
     unsafe {
-        print!("   ");
+        let mut header_row = vec![String::from("")];
         for c in CURRENT_COL..min(CURRENT_COL + VIEWPORT_SIZE, sheet.columns as i32) {
-            print!("{:^9}", get_col_label(c));
+            header_row.push(format!("{:9}", get_col_label(c)));
         }
-        println!();
+        output.push(header_row);
 
         for r in CURRENT_ROW..min(CURRENT_ROW + VIEWPORT_SIZE, sheet.rows as i32) {
-            print!("{:3}", r + 1);
+            let mut row_vec = vec![format!("{:3}", r + 1)];
             for c in CURRENT_COL..min(CURRENT_COL + VIEWPORT_SIZE, sheet.columns as i32) {
-                if sheet.all_cells[r as usize][c as usize].is_error {
-                    print!("{:^9}", "ERR");
+                let cell = &sheet.all_cells[r as usize][c as usize];
+                if cell.is_error {
+                    row_vec.push("ERR".to_string());
                 } else {
-                    print!("{:^9}", sheet.all_cells[r as usize][c as usize].value);
+                    row_vec.push(format!("{:9}", cell.value));
                 }
             }
-            println!();
+            output.push(row_vec);
         }
     }
+
+    let mut data = shared_data.lock().unwrap();
+    *data = output;
 }
 
-/*fn parse_cell_name(cell_name: &str) -> Option<(usize, usize)> {
-    // Implement parsing logic based on your C code's parseCellName function
-    unimplemented!()
-}
-
-fn parse_input(input: &str, sheet: &mut Sheet) {
-    // Implement parsing logic based on your C code's parseInput function
-    unimplemented!()
-}
-
-fn assign_cell(sheet: &mut Sheet, row: usize, col: usize, operation_id: i32, formula: &[Operand], count_operands: usize) {
-    // Implement cell assignment logic based on your C code's assign_cell function
-    unimplemented!()
-}*/
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -129,39 +137,36 @@ fn main() {
         process::exit(1);
     }
 
-    let mut sheet = initialise(rows as i32, columns as i32);
+    let mut sheet = initialise_extension(rows as i32, columns as i32);
+
 
     let mut input = String::new();
     let mut status_str = String::new();
     let mut execution_time = 0.0;
     let mut print_flag = true;
-    display_sheet(&sheet);
-
-    // let mut operation_id: i32 = 0;
-    // let  mut edit_row: i32 = 0;
-    // let mut edit_column: i32 = 0;
-    // let mut count_operands: i32 = 0;
-    // let mut formula: Vec<Operand> = vec![];
-
+    
+    let shared_data = Arc::new(Mutex::new(Vec::new()));
+    rust_lab::display::launch_gui(shared_data.clone());
+    display_sheet(&sheet, &shared_data);
     loop {
-        let mut operation_id: i32 = 0;
-        let mut edit_row: i32 = 0;
-        let mut edit_column: i32 = 0;
-        let mut count_operands: i32 = 0;
-        let mut formula: Vec<Operand> = vec![];
+        // let mut operation_id: i32 = 0;
+        // let mut edit_row: i32 = 0;
+        // let mut edit_column: i32 = 0;
+        // let mut count_operands: i32 = 0;
+        // let mut formula: Vec<Operand> = vec![];
         unsafe {
-            status_str = match STATUS {
+            status_str = match STATUS_extension {
                 0 => "ok".to_string(),
                 1 => {
-                    STATUS = 0;
+                    STATUS_extension = 0;
                     "Invalid Input".to_string()
                 }
                 2 => {
-                    STATUS = 0;
+                    STATUS_extension = 0;
                     "ok".to_string()
                 }
                 3 => {
-                    STATUS = 0;
+                    STATUS_extension = 0;
                     "cyclic dependence".to_string()
                 }
                 _ => "unknown status".to_string(),
@@ -178,6 +183,9 @@ fn main() {
 
             match input {
                 "q" => break,
+                "insert" => CURRENT_MODE = ModeOfSpreadsheet::INSERT,
+                "normal" => CURRENT_MODE = ModeOfSpreadsheet::NORMAL,
+                "visual" => CURRENT_MODE = ModeOfSpreadsheet::VISUAL,
                 "disable_output" => print_flag = false,
                 "enable_output" => print_flag = true,
                 "w" =>if(CURRENT_ROW -10 < 0){CURRENT_ROW=0;}else{CURRENT_ROW = CURRENT_ROW - 10;},
@@ -219,28 +227,50 @@ fn main() {
                         eprintln!("Out of bounds rows or columns");
                     }
                 }
-                _ => {
-                    parse_input(
-                        input,
-                        &mut sheet,
-                        rows,
-                        columns,
-                        &mut operation_id,
-                        &mut edit_row,
-                        &mut edit_column,
-                        &mut count_operands,
-                        &mut formula,
-                    );
-                    if STATUS != 1 {
-                        assign_cell(&mut sheet, edit_row, edit_column, operation_id, formula);
-                    }
-                }
+                _ => 
+                    match CURRENT_MODE {
+                        ModeOfSpreadsheet::NORMAL => parser_normal(input, rows, columns),
+
+                        ModeOfSpreadsheet::INSERT => {
+                            // Call parse_input and assign_cell_extension for INSERT mode
+                            let parts: Vec<&str> = input.split('=').collect();
+                            if parts.len() != 2 {
+                                eprintln!("Invalid input format. Expected 'cell_name=expression'.");
+                                STATUS_extension = 1;
+                                continue;
+                            }
+                            let cell_name = parts[0].trim();
+                            let expression = parts[1].trim();
+                            let mut edit_r = 0;
+                            let mut edit_col = 0;
+                            parse_cell_name(cell_name, &mut edit_r, &mut edit_col);
+    
+                            match parse_formula(expression) {
+                                Ok(parsed_formula) => {
+                                    let expr = *parsed_formula;
+                                    if STATUS_extension != 1 {
+                                        assign_cell_extension(&mut sheet, edit_r, edit_col, expr);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error parsing formula: {}", e);
+                                    STATUS_extension = 1;
+                                }
+                            }
+                        }
+                        ModeOfSpreadsheet::VISUAL => {
+                            // Handle VISUAL mode commands (e.g., copy, paste)
+                            parser_visual(input, &mut sheet);
+                        }
+                },
+                    
+            
             }
 
             execution_time = start.elapsed().as_secs_f64();
 
             if print_flag {
-                display_sheet(&sheet);
+                display_sheet(&sheet, &shared_data);
             }
         }
     }

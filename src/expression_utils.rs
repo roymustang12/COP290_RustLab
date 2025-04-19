@@ -1,6 +1,6 @@
 use crate::cell_extension::SpreadsheetExtension;
 use crate::cellsp::{CellReference};
-use crate::dependency_graph_final::STATUS;
+use crate::graph_extension::STATUS_extension;
 use std::str;
 use crate::expression_parser::Expr;
 use crate::formula::FormulaParser;
@@ -75,7 +75,7 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                     let divisor = eval_expr(right, sheet);
                     if divisor == 0 {
                         unsafe {
-                            STATUS = 2; // Error status for division by zero
+                            STATUS_extension = 2; // Error status for division by zero
                         }
                         0 // Return 0 for division by zero
                     } else {
@@ -84,7 +84,7 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                 },
                 _ => {
                     unsafe {
-                        STATUS = 12;
+                        STATUS_extension = 12;
                         panic!("Not a valid binary operation");
                     }
                     0
@@ -228,7 +228,7 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                 
                 _ => {
                     unsafe {
-                        STATUS = 1;
+                        STATUS_extension = 1;
                     }
                     0
                 }
@@ -237,7 +237,7 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
         
         Expr::Range(_, _) => {
             unsafe {
-                STATUS = 1;
+                STATUS_extension = 1;
             }
             0
         }
