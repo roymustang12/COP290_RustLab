@@ -34,11 +34,6 @@ const CELL_HEIGHT: i32 = 30;
 /// * The content of each cell is updated dynamically based on the `data`.
 /// * Styles such as bold, italics, and underline are applied based on specific markers in the cell content.
 ///
-/// # Example
-/// ```rust
-/// let shared_data = Arc::new(Mutex::new(vec![vec!["A1".to_string(), "B1".to_string()], vec!["A2".to_string(), "B2".to_string()]]));
-/// launch_gui(shared_data);
-/// ```
 
 pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
     thread::spawn(move || {
