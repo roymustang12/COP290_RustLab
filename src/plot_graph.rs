@@ -1,8 +1,17 @@
 use plotters::prelude::*;
-use plotters::style::{ BLUE, RED, WHITE};
+use plotters::style::{BLACK, BLUE, RED, WHITE};
+use plotters::coord::types::RangedCoordf64;
 
-
-/// Helper to generate cell names like A1, A2, ..., from index
+/// Generates cell names (e.g., A1, A2, ...) for a given column and range of rows.
+///
+/// # Arguments
+/// * `start_row` - The starting row index (0-based).
+/// * `col` - The column index (0-based).
+/// * `count` - The number of cell names to generate.
+///
+/// # Returns
+/// A vector of strings representing the generated cell names.
+///
 fn generate_cell_names(start_row: usize, col: usize, count: usize) -> Vec<String> {
     let mut names = Vec::new();
     for i in 0..count {
@@ -12,6 +21,17 @@ fn generate_cell_names(start_row: usize, col: usize, count: usize) -> Vec<String
     names
 }
 
+
+/// Plots a histogram for the given data and saves it to a file.
+///
+/// # Arguments
+/// * `data` - A slice of `f64` values representing the data to plot.
+/// * `filename` - The name of the file to save the histogram to.
+///
+/// # Returns
+/// * `Ok(())` if the histogram is successfully generated.
+/// * `Err` if an error occurs (e.g., empty data or file write failure).
+///
 pub fn plot_histogram(data: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     if data.is_empty() {
         return Err("No data provided for histogram".into());
@@ -62,6 +82,17 @@ pub fn plot_histogram(data: &[f64], filename: &str) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+
+/// Plots a line graph for the given data and saves it to a file.
+///
+/// # Arguments
+/// * `data` - A slice of `f64` values representing the data to plot.
+/// * `filename` - The name of the file to save the line graph to.
+///
+/// # Returns
+/// * `Ok(())` if the line graph is successfully generated.
+/// * `Err` if an error occurs (e.g., empty data or file write failure).
+///
 pub fn plot_line(data: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     if data.is_empty() {
         return Err("No data to plot".into());
@@ -103,6 +134,18 @@ pub fn plot_line(data: &[f64], filename: &str) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+
+/// Plots a scatter plot for the given x and y data and saves it to a file.
+///
+/// # Arguments
+/// * `x` - A slice of `f64` values representing the x-coordinates.
+/// * `y` - A slice of `f64` values representing the y-coordinates.
+/// * `filename` - The name of the file to save the scatter plot to.
+///
+/// # Returns
+/// * `Ok(())` if the scatter plot is successfully generated.
+/// * `Err` if an error occurs (e.g., mismatched lengths of x and y data or file write failure).
+///
 pub fn plot_scatter(x: &[f64], y: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     if x.len() != y.len() {
         return Err("x and y vectors must be the same length".into());

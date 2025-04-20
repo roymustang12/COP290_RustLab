@@ -9,10 +9,36 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+/// The number of rows in the spreadsheet display.
 const ROWS: usize = 11;
+
+/// The number of columns in the spreadsheet display.
 const COLS: usize = 11;
+
+/// The width of each cell in the spreadsheet display (in pixels).
 const CELL_WIDTH: i32 = 100;
+
+/// The height of each cell in the spreadsheet display (in pixels).
 const CELL_HEIGHT: i32 = 30;
+
+/// Launches the graphical user interface (GUI) for the spreadsheet.
+///
+/// This function creates a window and displays the spreadsheet in a grid format.
+/// It dynamically updates the display based on the data provided.
+///
+/// # Arguments
+/// * `data` - A thread-safe shared reference to the spreadsheet data. Each cell's content is represented as a `String`.
+///
+/// # Behavior
+/// * The GUI is displayed in a grid format with rows and columns.
+/// * The content of each cell is updated dynamically based on the `data`.
+/// * Styles such as bold, italics, and underline are applied based on specific markers in the cell content.
+///
+/// # Example
+/// ```rust
+/// let shared_data = Arc::new(Mutex::new(vec![vec!["A1".to_string(), "B1".to_string()], vec!["A2".to_string(), "B2".to_string()]]));
+/// launch_gui(shared_data);
+/// ```
 
 pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
     thread::spawn(move || {
@@ -21,6 +47,8 @@ pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
         let win_h = (ROWS as i32) * CELL_HEIGHT;
         let mut wind = Window::new(100, 100, win_w + 20, win_h + 20, "Rust Spreadsheet Display");
 
+
+         // Create a grid of frames to represent the spreadsheet cells
         let mut frames: Vec<Vec<Frame>> = vec![];
         for row in 0..ROWS {
             let mut row_frames = vec![];
@@ -38,8 +66,11 @@ pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
         wind.end();
         wind.show();
 
+         // Initialize previous data for comparison
+
         let mut prev_data = vec![vec![String::new(); COLS]; ROWS];
 
+        // Add an idle callback to update the GUI dynamically
         app::add_idle3(move |_| {
             let new_data = data.lock().unwrap().clone();
 
@@ -59,7 +90,7 @@ pub fn launch_gui(data: Arc<Mutex<Vec<Vec<String>>>>) {
                             frame.set_label(&label[1..label.len() - 1]); // Remove the _ markers
                             frame.set_label_font(Font::HelveticaItalic);
                         } else if label.starts_with("~") && label.ends_with("~") {
-                            // Underline (simulated by adding a marker)
+                            // BoldItalics (simulated by adding a marker)
                             frame.set_label(&label[1..label.len() - 1]); // Remove the ~ markers
                             frame.set_label_font(Font::HelveticaBoldItalic); // Default font
                             frame.set_frame(FrameType::FlatBox); // Simulate underline

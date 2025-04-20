@@ -4,12 +4,33 @@ use crate::graph_extension::STATUS_extension;
 use std::str;
 use crate::expression_parser::Expr;
 use crate::formula::FormulaParser;
-//THIS IS FOR EXTENSIONS
+
+
+/// Parses a formula string into an expression.
+///
+/// # Arguments
+/// * `input` - A string slice containing the formula to parse.
+///
+/// # Returns
+/// * `Ok(Box<Expr>)` - The parsed expression if successful.
+/// * `Err(String)` - An error message if parsing fails.
+
 pub fn parse_formula(input: &str) -> Result<Box<Expr>, String> {
     let parser = FormulaParser::new();
     parser.parse(input)
         .map_err(|e| format!("Parse error: {:?}", e))
 }
+
+
+/// Recursively extracts precedents (cell references) from an expression.
+///
+/// # Arguments
+/// * `expr` - A reference to the expression to analyze.
+/// * `acc` - A mutable vector to accumulate the extracted cell references.
+///
+/// # Behavior
+/// This function traverses the expression tree and collects all cell references
+/// (e.g., `A1`, `B2`) and ranges (e.g., `A1:B2`) into the accumulator.
 
 pub fn extract_precedents_helper(expr: &Expr, acc: &mut Vec<CellReference>) {
     match expr {
@@ -44,12 +65,33 @@ pub fn extract_precedents_helper(expr: &Expr, acc: &mut Vec<CellReference>) {
 }
 
 
+/// Extracts all precedents (cell references) from an expression.
+///
+/// # Arguments
+/// * `expr` - A reference to the expression to analyze.
+///
+/// # Returns
+/// A vector of `CellReference` objects representing all precedents in the expression.
 pub fn extract_precedents(expr: &crate::expression_parser::Expr) -> Vec<CellReference> {
     let mut acc = Vec::new();
     extract_precedents_helper(expr, &mut acc);
     acc
 }
 
+/// Evaluates an expression in the context of a spreadsheet.
+///
+/// # Arguments
+/// * `expr` - A reference to the expression to evaluate.
+/// * `sheet` - A reference to the spreadsheet containing cell values.
+///
+/// # Returns
+/// The evaluated result as an integer.
+///
+/// # Behavior
+/// * Supports basic arithmetic operations (`+`, `-`, `*`, `/`).
+/// * Supports functions like `SUM`, `MAX`, `MIN`, `AVG`, and `STDEV`.
+/// * Handles ranges (e.g., `A1:B2`) for functions like `SUM`.
+/// * Returns `0` for invalid operations or division by zero.
 pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
     match expr {
         Expr::Number(value) => {

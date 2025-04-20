@@ -9,6 +9,7 @@ use crate::expression_utils::{eval_expr, extract_precedents};
 
 use lazy_static::lazy_static;
 
+/// A global channel used for thread communication in the spreadsheet.
 lazy_static! {
     static ref SLEEP_CHANNEL: (
         Arc<Mutex<Sender<(i32, i32, i32)>>>,
@@ -19,8 +20,18 @@ lazy_static! {
     };
 }
 
+/// A global status variable for tracking errors in the spreadsheet.
 pub static mut STATUS_extension: i32 = 0;
 
+
+/// Initializes the spreadsheet with the given number of rows and columns.
+///
+/// # Arguments
+/// * `rows` - The number of rows in the spreadsheet.
+/// * `columns` - The number of columns in the spreadsheet.
+///
+/// # Returns
+/// A `SpreadsheetExtension` object with all cells initialized.
 pub fn initialise_extension(rows: i32, columns: i32) -> SpreadsheetExtension {
     let mut all_cells = Vec::with_capacity(rows as usize);
     for r in 0..rows {
@@ -37,6 +48,8 @@ pub fn initialise_extension(rows: i32, columns: i32) -> SpreadsheetExtension {
                 is_error: false,
                 dependents: HashSet::new(),
                 precedents: HashSet::new(),
+                is_bold: false,
+                is_italics: false,
             };
             row.push(curr_cell);
         }
@@ -50,6 +63,15 @@ pub fn initialise_extension(rows: i32, columns: i32) -> SpreadsheetExtension {
     }
 }
 
+
+///Adds a dependency between two cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rf` - The row index of the precedent cell.
+/// * `cf` - The column index of the precedent cell.
+/// * `rt` - The row index of the dependent cell.
+/// * `ct` - The column index of the dependent cell.
 pub fn add_dependency_extension(sheet: &mut SpreadsheetExtension, rf: i32, cf: i32, rt: i32, ct: i32) {
     let dependent_cell = CellReference {
         row: rt,
@@ -67,6 +89,14 @@ pub fn add_dependency_extension(sheet: &mut SpreadsheetExtension, rf: i32, cf: i
         .insert(precedent_cell);
 }
 
+/// Deletes a dependency between two cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rf` - The row index of the precedent cell.
+/// * `cf` - The column index of the precedent cell.
+/// * `rt` - The row index of the dependent cell.
+/// * `ct` - The column index of the dependent cell.
 pub fn delete_dependency_extension(sheet: &mut SpreadsheetExtension, rf: i32, cf: i32, rt: i32, ct: i32) {
     let dependent_cell = CellReference {
         row: rt,
@@ -77,11 +107,27 @@ pub fn delete_dependency_extension(sheet: &mut SpreadsheetExtension, rf: i32, cf
         .remove(&dependent_cell);
 }
 
+/// Clears all precedents of a given cell.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - The row index of the cell.
+/// * `ct` - The column index of the cell.
 pub fn clear_precedents_extension(sheet: &mut SpreadsheetExtension, rt: i32, ct: i32) {
     let cell = &mut sheet.all_cells[rt as usize][ct as usize];
     cell.precedents = HashSet::new();
 }
 
+
+/// Calculates the value of a cell based on its formula.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - The row index of the cell.
+/// * `ct` - The column index of the cell.
+///
+/// # Behavior
+/// Updates the cell's value and error status based on its formula.
 pub fn calculate_cell_value_extension(sheet: &mut SpreadsheetExtension, rt: i32, ct: i32) {
    
     let formula =  &sheet.all_cells[rt as usize][ct as usize].formula;
@@ -159,6 +205,15 @@ pub fn calculate_cell_value_extension(sheet: &mut SpreadsheetExtension, rt: i32,
 
 }
 
+
+/// Checks if an expression has an error.
+///
+/// # Arguments
+/// * `expr` - A reference to the expression.
+/// * `sheet` - A reference to the spreadsheet.
+///
+/// # Returns
+/// `true` if the expression has an error, `false` otherwise.
 pub fn expr_has_error(expr: &Expr, sheet: &SpreadsheetExtension) -> bool {
     match expr {
         Expr::Number(_) => {
@@ -211,13 +266,30 @@ pub fn expr_has_error(expr: &Expr, sheet: &SpreadsheetExtension) -> bool {
     }
 }
 
-//Fuck you Sleep
 
+/// Checks if a division by zero occurs in the formula of a specific cell.
+///
+/// # Arguments
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rt` - The row index of the cell.
+/// * `ct` - The column index of the cell.
+///
+/// # Returns
+/// `true` if a division by zero is detected, `false` otherwise.
 pub fn zero_div_err_extension(sheet: &SpreadsheetExtension, rt: i32, ct: i32) -> bool {
     let formula = &sheet.all_cells[rt as usize][ct as usize].formula;
     check_division_by_zero(formula, sheet)
 }
 
+
+/// Recursively checks if a division by zero occurs in an expression.
+///
+/// # Arguments
+/// * `expr` - A reference to the expression to analyze.
+/// * `sheet` - A reference to the spreadsheet.
+///
+/// # Returns
+/// `true` if a division by zero is detected, `false` otherwise.
 fn check_division_by_zero(expr: &Expr, sheet: &SpreadsheetExtension) -> bool {
     match expr {
         Expr::Number(_) => false,
@@ -252,6 +324,15 @@ fn check_division_by_zero(expr: &Expr, sheet: &SpreadsheetExtension) -> bool {
 }
 
 
+/// Checks if any of the precedents of a specific cell have an error.
+///
+/// # Arguments
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rt` - The row index of the cell.
+/// * `ct` - The column index of the cell.
+///
+/// # Returns
+/// `true` if any precedent of the cell has an error, `false` otherwise.
 pub fn precedent_has_error_extension(sheet: &SpreadsheetExtension, rt: i32, ct: i32) -> bool {
     let precedents = &sheet.all_cells[rt as usize][ct as usize].precedents;
     for cell_ref in precedents {
@@ -264,7 +345,17 @@ pub fn precedent_has_error_extension(sheet: &SpreadsheetExtension, rt: i32, ct: 
     }
     false
 }
-
+/// Performs a depth-first search (DFS) to detect cycles in the dependency graph.
+///
+/// # Arguments
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rs` - The row index of the current cell.
+/// * `cs` - The column index of the current cell.
+/// * `visited` - A mutable set of visited cells.
+/// * `recursion_stack` - A mutable set representing the current recursion stack.
+///
+/// # Returns
+/// `true` if a cycle is detected, `false` otherwise.
 pub fn dfs_cycle_detection(
     sheet: &SpreadsheetExtension,
     rs: i32,
@@ -304,12 +395,31 @@ pub fn dfs_cycle_detection(
     false
 }
 
+/// Checks if a cycle exists in the dependency graph starting from a specific cell.
+///
+/// # Arguments
+/// * `sheet` - A reference to the spreadsheet.
+/// * `row` - The row index of the starting cell.
+/// * `col` - The column index of the starting cell.
+///
+/// # Returns
+/// `true` if a cycle is detected, `false` otherwise.
 pub fn has_cycle(sheet: &SpreadsheetExtension, row: i32, col: i32) -> bool {
     let mut visited: HashSet<(i32, i32)> = HashSet::new();
     let mut recursion_stack: HashSet<(i32, i32)> = HashSet::new();
     dfs_cycle_detection(sheet, row, col, &mut visited, &mut recursion_stack)
 }
 
+
+/// Recalculates the values of all dependent cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rs` - The row index of the starting cell.
+/// * `cs` - The column index of the starting cell.
+///
+/// # Behavior
+/// Updates the values of all dependent cells and propagates errors if necessary.
 pub fn recalculate_dependents_extension(sheet: &mut SpreadsheetExtension, rs: i32, cs: i32) {
     let mut q:VecDeque<(i32, i32)> = VecDeque::new();
     {
@@ -343,6 +453,20 @@ pub fn recalculate_dependents_extension(sheet: &mut SpreadsheetExtension, rs: i3
     }
 }
 
+
+
+/// Assigns a formula to a cell and updates its value and dependencies.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - The row index of the cell.
+/// * `ct` - The column index of the cell.
+/// * `formula` - The formula to assign to the cell.
+///
+/// # Behavior
+/// * Updates the cell's formula and recalculates its value.
+/// * Updates the dependency graph and propagates changes to dependent cells.
+/// * Detects and handles cycles in the dependency graph.
 pub fn assign_cell_extension(
     sheet: &mut SpreadsheetExtension, 
     rt: i32,
@@ -404,8 +528,7 @@ pub fn assign_cell_extension(
         for new_precedent in &new_precedents {
             delete_dependency_extension(sheet, new_precedent.row, new_precedent.column, rt, ct);
         }
-
+        
     }
 
 }
-

@@ -5,7 +5,21 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 
-
+/// Reads a CSV file and populates the spreadsheet with its contents.
+///
+/// # Arguments
+/// * `filename` - The name of the CSV file to read.
+/// * `sheet` - A mutable reference to the spreadsheet.
+///
+/// # Returns
+/// * `Ok(())` if the file is successfully read and processed.
+/// * `Err` if an error occurs (e.g., file not found or invalid CSV format).
+///
+/// # Behavior
+/// * Trims whitespace from cell values.
+/// * Supports flexible row lengths in the CSV file.
+/// * Handles formula cells (starting with `=`) by parsing and assigning them.
+/// 
 pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension) -> Result<(), Box<dyn Error>> {
     let path = Path::new(filename);
     
@@ -18,10 +32,8 @@ pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension) -> Result
     let file = File::open(path)?;
     
     
-    // Explicitly set has_headers to false to ensure first row is processed as data
-    let mut rdr = csv::ReaderBuilder::new()
-        .has_headers(false)  // <-- Add this line to prevent skipping first row
-        .flexible(true)      // Allow rows with different lengths
+    let mut rdr = csv::ReaderBuilder::new().has_headers(false)  // No headers in CSV
+        .flexible(true)  // Allow rows with different lengths
         .trim(csv::Trim::All)  // Trim whitespace
         .from_reader(file);
     
@@ -70,6 +82,19 @@ pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension) -> Result
     Ok(())
 }
 
+
+/// Stores a cell value in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `row` - The row index of the cell.
+/// * `col` - The column index of the cell.
+/// * `value` - The value to store in the cell.
+///
+/// # Behavior
+/// * If the value is numeric, it is stored as an integer.
+/// * If the value is non-numeric, it is stored as `0` (or as a string if supported).
+///
 fn store_cell_value(sheet: &mut SpreadsheetExtension, row: usize, col: usize, value: &str) {
     // Try to parse as integer
     if let Ok(num_value) = value.parse::<i32>() {
@@ -84,7 +109,16 @@ fn store_cell_value(sheet: &mut SpreadsheetExtension, row: usize, col: usize, va
 
 
 
-
+/// Handles the `read` command to load a CSV file into the spreadsheet.
+///
+/// # Arguments
+/// * `cmd` - The command string (e.g., `read data.csv`).
+/// * `sheet` - A mutable reference to the spreadsheet.
+///
+/// # Returns
+/// * `true` if the command is successfully executed.
+/// * `false` if the command is invalid or an error occurs.
+///
 pub fn handle_read_command(cmd: &str, sheet: &mut SpreadsheetExtension) -> bool {
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     

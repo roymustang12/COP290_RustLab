@@ -76,7 +76,6 @@ fn parser_normal(input: &str, rows: i32, cols: i32) {
 
 
 
-
 fn get_col_label(col: i32) -> String {
     let mut col = col + 1; // 1-based index
     let mut label = String::new();
@@ -161,7 +160,7 @@ fn main() {
     let mut print_flag = true;
     
     let shared_data = Arc::new(Mutex::new(Vec::new()));
-    // rust_lab::display::launch_gui(shared_data.clone());
+    rust_lab::display::launch_gui(shared_data.clone());
     display_sheet(&sheet, &shared_data);
     loop {
         // let mut operation_id: i32 = 0;

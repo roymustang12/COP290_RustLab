@@ -6,7 +6,12 @@ use crate::expression_utils::parse_formula;
 use crate::plot_graph::{plot_histogram, plot_line, plot_scatter};
 
 
-
+/// Parses a cell name (e.g., "A1") into its row and column indices.
+///
+/// # Arguments
+/// * `cell_name` - The cell name as a string (e.g., "A1").
+/// * `row` - A mutable reference to store the parsed row index.
+/// * `col` - A mutable reference to store the parsed column index.
 pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
     let chars: Vec<char> = cell_name.chars().collect();
     let mut i = 0;
@@ -39,7 +44,13 @@ pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
     *row = string_to_int(row_part) - 1;
 }
 
-
+/// Converts a numeric string to an integer.
+///
+/// # Arguments
+/// * `num_str` - The numeric string to convert.
+///
+/// # Returns
+/// The integer value of the string. Returns `0` if the string is invalid.
 pub fn string_to_int(num_str: &str) -> i32 {
     let mut num = 0;
     let mut i = 0;
@@ -71,7 +82,70 @@ pub fn string_to_int(num_str: &str) -> i32 {
 }
 
 
-
+/// Parses and executes visual mode commands for the spreadsheet.
+///
+/// # Arguments
+/// * `input` - The command string entered by the user.
+/// * `sheet` - A mutable reference to the spreadsheet.
+///
+/// # Supported Commands
+///
+/// ## Filtering
+/// * **Command**: `filter <range> <comparator> <value>`
+/// * **Description**: Filters cells in the specified range based on the given condition.
+/// * **Example**: `filter A1:B2 > 10`
+///
+/// ## Cutting a Single Cell
+/// * **Command**: `dc <source_cell> <destination_cell>`
+/// * **Description**: Cuts the value from the source cell and pastes it into the destination cell.
+/// * **Example**: `dc A1 B1`
+///
+/// ## Copying a Single Cell
+/// * **Command**: `yc <source_cell> <destination_cell>`
+/// * **Description**: Copies the value from the source cell and pastes it into the destination cell.
+/// * **Example**: `yc A1 B1`
+///
+/// ## Cutting a Range of Cells
+/// * **Command**: `d <source_range> <destination_range>`
+/// * **Description**: Cuts the values from the source range and pastes them into the destination range.
+/// * **Example**: `d A1:B2 C1:D2`
+///
+/// /// ## Copying a Range of Cells
+/// * **Command**: `y <source_range> <destination_range>`
+/// * **Description**: Copies the values from the source range and pastes them into the destination range.
+/// * **Example**: `y A1:B2 C1:D2`
+///
+/// ## Plotting a Histogram
+/// * **Command**: `plot_histogram <range> <filename>`
+/// * **Description**: Generates a histogram for the values in the specified range and saves it to the given file.
+/// * **Example**: `plot_histogram A1:A10 histogram.png`
+///
+/// ## Plotting a Line Graph
+/// * **Command**: `plot_line <range> <filename>`
+/// * **Description**: Generates a line graph for the values in the specified range and saves it to the given file.
+/// * **Example**: `plot_line A1:A10 line.png`
+///
+/// ## Plotting a Scatter Plot
+/// * **Command**: `plot_scatter <x_range> <y_range> <filename>`
+/// * **Description**: Generates a scatter plot for the values in the specified x and y ranges and saves it to the given file.
+/// * **Example**: `plot_scatter A1:A10 B1:B10 scatter.png`
+///
+/// ## Forecasting Future Values
+/// * **Command**: `forecast <length> <x_range> <y_range> <filename>`
+/// * **Description**: Forecasts future values based on the given x and y ranges using linear regression and saves the scatter plot to the given file.
+/// * **Example**: `forecast 5 A1:A10 B1:B10 forecast.png`
+/// /// ## Applying Bold Formatting
+/// * **Command**: `b <cell_name>`
+/// * **Description**: Applies bold formatting to the specified cell.
+/// * **Example**: `b A1`
+///
+/// ## Applying Italics Formatting
+/// * **Command**: `i <cell_name>`
+/// * **Description**: Applies italics formatting to the specified cell.
+/// * **Example**: `i A1`
+///
+/// # Behavior
+/// Executes commands such as filtering, copying, cutting, pasting, plotting, and forecasting.
 pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
     unsafe {
         let parts: Vec<&str> = input.split_whitespace().collect();
@@ -81,6 +155,31 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
         }
 
         match parts[0] {
+            "b" => {
+                        if parts.len() != 2 {
+                            STATUS_extension = 1;
+                            return;
+                        }
+                        let mut row = 0;
+                        let mut col = 0;
+                        parse_cell_name(parts[1], &mut row, &mut col);
+
+                        sheet.all_cells[row as usize][col as usize].is_bold = true;
+                    //     println!("Applied bold formatting to cell {}", parts[1]);
+                    }
+
+            "i" => {
+                if parts.len() != 2 {
+                    STATUS_extension = 1;
+                    return;
+                }
+                let mut row = 0;
+                let mut col = 0;
+                parse_cell_name(parts[1], &mut row, &mut col);
+
+                sheet.all_cells[row as usize][col as usize].is_italics = true;
+                // println!("Applied italics formatting to cell {}", parts[1]);
+                        }
             "filter" => {
                         if parts.len() != 4 {
                             eprintln!("Invalid format. Expected: filter <range> <comparator> <value>");
@@ -410,6 +509,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
             }
 
             "forecast" => {
+                println!("enterde into foreacst");
                 let forecast_len = string_to_int(parts[1]);
 
                 let mut x_start_row = 0;
