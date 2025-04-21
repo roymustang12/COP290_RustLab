@@ -443,21 +443,29 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 let mut end_row = 0;
                 let mut end_col = 0;
 
+                // Parse the start and end cell names from the range
                 parse_cell_name(parts[1].split(':').next().unwrap(), &mut start_row, &mut start_col);
                 parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut end_row, &mut end_col);
 
-                let mut data = Vec::new();
+                // Initialize a Vec for each column
+                let num_cols = end_col - start_col + 1;
+                let mut data: Vec<Vec<f64>> = vec![Vec::new(); num_cols as usize];
+
+                // Populate the data for each column within the specified range
                 for r in start_row..=end_row {
-                    for c in start_col..=end_col {
+                    for (i, c) in (start_col..=end_col).enumerate() {
                         let value = sheet.all_cells[r as usize][c as usize].value as f64;
-                        data.push(value);
+                        data[i].push(value); // Group by column
                     }
                 }
 
+                // Pass `start_row` to plot_line to correctly reflect the row numbers on the x-axis
                 if let Err(e) = plot_line(&data, parts[2]) {
                     eprintln!("Error generating line plot: {}", e);
                 }
             }
+
+
 
             "plot_scatter" => {
                 if parts.len() != 4 {

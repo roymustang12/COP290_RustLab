@@ -1,7 +1,7 @@
 use plotters::prelude::*;
 use plotters::style::{BLACK, BLUE, RED, WHITE};
 use plotters::coord::types::RangedCoordf64;
-
+const GRAY: RGBColor = RGBColor(169, 169, 169); 
 /// Generates cell names (e.g., A1, A2, ...) for a given column and range of rows.
 ///
 /// # Arguments
@@ -92,47 +92,67 @@ pub fn plot_histogram(data: &[f64], filename: &str) -> Result<(), Box<dyn std::e
 /// # Returns
 /// * `Ok(())` if the line graph is successfully generated.
 /// * `Err` if an error occurs (e.g., empty data or file write failure).
-///
-pub fn plot_line(data: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-    if data.is_empty() {
+
+
+
+
+pub fn plot_line(data: &[Vec<f64>], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if data.is_empty() || data.iter().all(|col| col.is_empty()) {
         return Err("No data to plot".into());
     }
 
+    // Create a drawing area
     let root = BitMapBackend::new(filename, (640, 480)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let max_y = data.iter().cloned().fold(f64::NAN, f64::max).ceil().max(1.0);
-    let y_range = 0f64..max_y;
-    let x_range = 0..data.len();
+    // Determine maximum length (x range) and y value (y range)
+    let x_max = data.iter().map(|col| col.len()).max().unwrap_or(0);
+    let y_max = data
+        .iter()
+        .flat_map(|col| col.iter())
+        .cloned()
+        .fold(f64::NAN, f64::max)
+        .max(1.0);
 
-    let cell_names = generate_cell_names(0, 0, data.len());
-
+    // Create a chart and set the range for x and y axes
     let mut chart = ChartBuilder::on(&root)
         .caption("Line Plot", ("sans-serif", 30))
         .margin(10)
-        .x_label_area_size(40)
-        .y_label_area_size(40)
-        .build_cartesian_2d(x_range.clone(), y_range.clone())?;
+        .set_label_area_size(LabelAreaPosition::Left, 40)
+        .set_label_area_size(LabelAreaPosition::Bottom, 40)
+        // Use Range instead of RangeInclusive for the x-axis
+        .build_cartesian_2d(0..x_max as i32, 0f64..y_max)?;
 
+    chart.configure_mesh().draw()?;
+
+
+    let colors = [
+        &BLUE, &RED, &GREEN, &CYAN, &MAGENTA, &BLACK, &YELLOW, &GRAY,
+    ];
+    
+    // Plot each column as a line series
+    for (i, column) in data.iter().enumerate() {
+        let color = colors[i % colors.len()];
+
+        // Draw the line series for each column
+        chart.draw_series(LineSeries::new(
+            column.iter().enumerate().map(|(x, y)| (x as i32, *y)),
+            color,
+        ))?
+        .label(format!("Col {}", i + 1))
+        .legend(move |(x, y)| PathElement::new([(x, y), (x + 20, y)], color));
+    }
+
+    // Configure and draw the legend
     chart
-        .configure_mesh()
-        .x_desc("Cell Index")
-        .y_desc("Cell Value")
-        .x_labels(data.len())
-        .y_labels(max_y as usize + 1)
-        .label_style(("sans-serif", 12))
-        .axis_desc_style(("sans-serif", 15))
-        .x_label_formatter(&|x| cell_names.get(*x).unwrap_or(&"".to_string()).to_string())
-        .y_label_formatter(&|y| format!("{:.0}", y))
+        .configure_series_labels()
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
         .draw()?;
-
-    chart.draw_series(LineSeries::new(
-        data.iter().enumerate().map(|(i, v)| (i, *v)),
-        &BLUE,
-    ))?;
 
     Ok(())
 }
+
 
 
 /// Plots a scatter plot for the given x and y data and saves it to a file.
