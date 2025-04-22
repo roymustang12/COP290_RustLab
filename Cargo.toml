@@ -7,11 +7,11 @@ edition = "2024"
 lalrpop = "0.22.1"
 
 [dependencies]
-chrono ="0.4"
-printpdf ="0.5.3"
-csv = "1.2"
-fltk = { version = "1.5", features = ["fltk-bundled"] }
+
 plotters = "0.3.4"
 lazy_static = "1.5.0"
 lalrpop-util = { version = "0.22.1", features = ["lexer", "unicode"] }
 regex = "1"
+csv = "1.2"
+chrono = "0.4"
+printpdf = "0.5.3"
