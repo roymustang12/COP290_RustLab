@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::usize::MAX;
 use crate::expression_parser::Expr;
 use crate::expression_utils::{eval_expr, extract_precedents};
 
@@ -22,6 +23,8 @@ lazy_static! {
 
 /// A global status variable for tracking errors in the spreadsheet.
 pub static mut STATUS_extension: i32 = 0;
+
+const MAX_UNDO: usize = 17;
 
 
 /// Initializes the spreadsheet with the given number of rows and columns.
@@ -469,10 +472,22 @@ pub fn recalculate_dependents_extension(sheet: &mut SpreadsheetExtension, rs: i3
 /// * Detects and handles cycles in the dependency graph.
 pub fn assign_cell_extension(
     sheet: &mut SpreadsheetExtension, 
+    undo_manager: &mut UndoRedoStack,
     rt: i32,
     ct: i32,
     formula: Expr
 ) {
+
+    let old_state = CellState {
+        row: rt,
+        column: ct,
+        is_error: sheet.all_cells[rt as usize][ct as usize].is_error,
+        formula: sheet.all_cells[rt as usize][ct as usize].formula.clone(),
+        precedents: sheet.all_cells[rt as usize][ct as usize].precedents.clone(),
+    };
+
+    undo_manager.push_state(old_state);
+
     let old_precedents = {
         let cell = &sheet.all_cells[rt as usize][ct as usize];
         cell.precedents.clone()
@@ -532,3 +547,127 @@ pub fn assign_cell_extension(
     }
 
 }
+#[derive(Clone)]
+pub struct CellState {
+    row: i32,
+    column: i32,
+    formula: Expr,
+    is_error: bool,
+    precedents: HashSet<CellReference>, 
+}
+
+
+//When an assignment is done to a cell push onto the undo stack
+//When an undo is done pop off the undo stack and push onto the redo stack 
+#[derive(Clone)]
+pub struct UndoRedoStack{
+    undo_stack: Vec<CellState>,
+    redo_stack: Vec<CellState>,
+}
+
+impl UndoRedoStack{
+    pub fn new() -> Self {
+        UndoRedoStack { 
+            undo_stack: Vec::with_capacity(MAX_UNDO), 
+            redo_stack: Vec::new(), 
+        }
+    }
+
+    pub fn push_state(&mut self, state: CellState) {
+        self.undo_stack.push(state);
+        if self.redo_stack.len() > MAX_UNDO {
+            self.redo_stack.clear();
+        }
+        self.redo_stack.clear();
+
+        if self.undo_stack.len() > MAX_UNDO {
+            self.undo_stack.remove(0);
+        }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn pop_undo(&mut self) -> Option<CellState> {
+        self.undo_stack.pop()
+    }
+
+    pub fn push_redo(&mut self, state: CellState) {
+        self.redo_stack.push(state);
+    }
+
+    pub fn pop_redo(&mut self) -> Option<CellState> {
+        self.redo_stack.pop()
+    }
+
+}
+
+pub fn perform_undo(sheet: &mut SpreadsheetExtension, undo_manager: &mut UndoRedoStack) -> bool {
+    if let Some(old_state) = undo_manager.pop_undo() {
+        let current_state = CellState {
+            row: old_state.row,
+            column: old_state.column,
+            formula: sheet.all_cells[old_state.row as usize][old_state.column as usize].formula.clone(),
+            precedents: sheet.all_cells[old_state.row as usize][old_state.column as usize].precedents.clone(),
+            is_error: sheet.all_cells[old_state.row as usize][old_state.column as usize].is_error,
+        };
+
+        undo_manager.push_redo(current_state);
+
+        restore_cell_state(sheet, old_state);
+        true
+
+    } else {
+        false
+    }
+}
+
+pub fn perform_redo(sheet: &mut SpreadsheetExtension, undo_manager: &mut UndoRedoStack) -> bool {
+    if let Some(redo_state) = undo_manager.pop_redo() {
+        let current_state = CellState {
+            row: redo_state.row,
+            column: redo_state.column,
+            is_error: redo_state.is_error,
+            formula: sheet.all_cells[redo_state.row as usize][redo_state.column as usize].formula.clone(),
+            precedents: sheet.all_cells[redo_state.row as usize][redo_state.column as usize].precedents.clone(),
+        };
+        
+        restore_cell_state(sheet, redo_state);
+
+        undo_manager.push_state(current_state);
+
+        true
+    }
+    else {
+        false
+    }
+}
+
+pub fn restore_cell_state(sheet: &mut SpreadsheetExtension, state: CellState) {
+    let precedents = sheet.all_cells[state.row as usize][state.column as usize].precedents.clone();
+    
+    for prec_ref in precedents {
+        delete_dependency_extension(sheet, prec_ref.row, prec_ref.column, state.row, state.column);
+    }
+
+    clear_precedents_extension(sheet, state.row, state.column);
+
+    sheet.all_cells[state.row as usize][state.column as usize].formula = state.formula;
+
+    for prec_ref in &state.precedents {
+        add_dependency_extension(sheet, prec_ref.row, prec_ref.column, state.row, state.column);
+    }
+
+    calculate_cell_value_extension(sheet, state.row, state.column);
+
+    recalculate_dependents_extension(sheet, state.row, state.column);
+
+}
+
+
+

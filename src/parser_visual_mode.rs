@@ -1,5 +1,5 @@
 use crate::forecast::{self, forecast};
-use crate::graph_extension::assign_cell_extension;
+use crate::graph_extension::{assign_cell_extension, UndoRedoStack};
 use crate::cell_extension::SpreadsheetExtension;
 use crate::graph_extension::STATUS_extension;
 use crate::expression_utils::parse_formula;
@@ -146,7 +146,7 @@ pub fn string_to_int(num_str: &str) -> i32 {
 ///
 /// # Behavior
 /// Executes commands such as filtering, copying, cutting, pasting, plotting, and forecasting.
-pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
+pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager: &mut UndoRedoStack) {
     unsafe {
         let parts: Vec<&str> = input.split_whitespace().collect();
         if parts.is_empty() {
@@ -260,17 +260,18 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 let mut start_col = 0;
                 let mut end_row = 0;
                 let mut end_col = 0;
+                
                 parse_cell_name(parts[1], &mut start_row, &mut start_col);
                 parse_cell_name(parts[2], &mut end_row, &mut end_col);
 
                 let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
                 let value2 = "0";
                 if let Ok(parsed_formula) = parse_formula(&value2) {
-                    assign_cell_extension(sheet, start_row, start_col, *parsed_formula);
+                    assign_cell_extension(sheet,undo_manager, start_row, start_col, *parsed_formula);
                 }
                 
                 if let Ok(parsed_formula) = parse_formula(&value) {
-                    assign_cell_extension(sheet, end_row, end_col, *parsed_formula);
+                    assign_cell_extension(sheet,undo_manager, end_row, end_col, *parsed_formula);
                 }
             }
             "yc" => { //copy cell
@@ -289,13 +290,13 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
 
                 if let Ok(parsed_formula) = parse_formula(&value) {
-                    assign_cell_extension(sheet, end_row, end_col, *parsed_formula);
+                    assign_cell_extension(sheet,undo_manager,end_row, end_col, *parsed_formula);
                 }
 
                
             } 
             "d" => {   // cut and paste fro a range of cells
-                if parts.len() != 5 {
+                if parts.len() != 3 {
                     STATUS_extension= 1;
                     return;
                 }
@@ -309,13 +310,12 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 let mut dest_end_row = 0;
                 let mut dest_end_col = 0;
 
-                // Parse source range
-                parse_cell_name(parts[1], &mut start_row, &mut start_col);
-                parse_cell_name(parts[2], &mut end_row, &mut end_col);
+                parse_cell_name(parts[1].split(':').next().unwrap(), &mut start_row, &mut start_col);
+                parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut end_row, &mut end_col);
 
-                // Parse destination range
-                parse_cell_name(parts[3], &mut dest_start_row, &mut dest_start_col);
-                parse_cell_name(parts[4], &mut dest_end_row, &mut dest_end_col);
+                parse_cell_name(parts[2].split(':').next().unwrap(), &mut dest_start_row, &mut dest_start_col);
+                parse_cell_name(parts[2].split(':').nth(1).unwrap(), &mut dest_end_row, &mut dest_end_col);
+
 
                 // Ensure the source and destination ranges have the same dimensions
                 if (end_row - start_row) != (dest_end_row - dest_start_row)
@@ -339,12 +339,12 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                         // Clear the source cell
                         let clear_formula = "0";
                         if let Ok(parsed_formula) = parse_formula(clear_formula) {
-                            assign_cell_extension(sheet, src_row, src_col, *parsed_formula);
+                            assign_cell_extension(sheet,undo_manager, src_row, src_col, *parsed_formula);
                         }
 
                         // Assign the value/formula to the destination cell
                         if let Ok(parsed_formula) = parse_formula(&value) {
-                            assign_cell_extension(sheet, dest_row, dest_col, *parsed_formula);
+                            assign_cell_extension(sheet,undo_manager,dest_row, dest_col, *parsed_formula);
                         }
                     }
                 }
@@ -352,7 +352,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
             }
             "y" => {
 
-                if parts.len() != 5 {
+                if parts.len() != 3 {
                     STATUS_extension= 1;
                     return;
                 }
@@ -366,13 +366,11 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
                 let mut dest_end_row = 0;
                 let mut dest_end_col = 0;
 
-                // Parse source range
-                parse_cell_name(parts[1], &mut start_row, &mut start_col);
-                parse_cell_name(parts[2], &mut end_row, &mut end_col);
+                parse_cell_name(parts[1].split(':').next().unwrap(), &mut start_row, &mut start_col);
+                parse_cell_name(parts[1].split(':').nth(1).unwrap(), &mut end_row, &mut end_col);
 
-                // Parse destination range
-                parse_cell_name(parts[3], &mut dest_start_row, &mut dest_start_col);
-                parse_cell_name(parts[4], &mut dest_end_row, &mut dest_end_col);
+                parse_cell_name(parts[2].split(':').next().unwrap(), &mut dest_start_row, &mut dest_start_col);
+                parse_cell_name(parts[2].split(':').nth(1).unwrap(), &mut dest_end_row, &mut dest_end_col);
 
                 // Ensure the source and destination ranges have the same dimensions
                 if (end_row - start_row) != (dest_end_row - dest_start_row)
@@ -395,7 +393,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension) {
 
                         // Assign the value/formula to the destination cell
                         if let Ok(parsed_formula) = parse_formula(&value) {
-                            assign_cell_extension(sheet, dest_row, dest_col, *parsed_formula);
+                            assign_cell_extension(sheet,undo_manager, dest_row, dest_col, *parsed_formula);
                         }
                     }
                 }

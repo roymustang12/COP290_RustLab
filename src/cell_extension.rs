@@ -5,6 +5,7 @@ use crate::expression_parser::Expr;
 ///
 /// This struct contains additional properties for a cell, such as its value, formula,
 /// formatting options (bold, italics, underline), and dependency relationships.
+#[derive(Clone)]
 pub struct  CellExtension {
      /// The value of the cell.
      pub value: i32,
@@ -31,6 +32,7 @@ pub struct  CellExtension {
 /// Represents the spreadsheet as a whole.
 ///
 /// This struct contains the dimensions of the spreadsheet and all the cells within it.
+#[derive(Clone)]
 pub struct SpreadsheetExtension {
    /// The number of rows in the spreadsheet.
    pub rows: i32,
