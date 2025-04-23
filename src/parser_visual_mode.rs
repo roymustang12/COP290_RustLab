@@ -264,15 +264,18 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
                 parse_cell_name(parts[1], &mut start_row, &mut start_col);
                 parse_cell_name(parts[2], &mut end_row, &mut end_col);
 
-                let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
+                let mut value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
+                if(sheet.all_cells[start_row as usize][start_col as usize].is_error == true){
+                    value="1/0".to_string();
+                 }
                 let value2 = "0";
                 if let Ok(parsed_formula) = parse_formula(&value2) {
                     assign_cell_extension(sheet,undo_manager, start_row, start_col, *parsed_formula);
                 }
-                
                 if let Ok(parsed_formula) = parse_formula(&value) {
                     assign_cell_extension(sheet,undo_manager, end_row, end_col, *parsed_formula);
                 }
+                
             }
             "yc" => { //copy cell
                 if parts.len() != 3 {
@@ -287,7 +290,10 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
                 parse_cell_name(parts[2], &mut end_row, &mut end_col);
 
                 
-                let value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
+                let mut value = sheet.all_cells[start_row as usize][start_col as usize].value.to_string();
+                if(sheet.all_cells[start_row as usize][start_col as usize].is_error == true){
+                    value="1/0".to_string();
+                 }
 
                 if let Ok(parsed_formula) = parse_formula(&value) {
                     assign_cell_extension(sheet,undo_manager,end_row, end_col, *parsed_formula);
@@ -334,7 +340,10 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
                         let dest_col = dest_start_col + c;
 
                         // Get the value/formula from the source cell
-                        let value = sheet.all_cells[src_row as usize][src_col as usize].value.to_string();
+                        let mut value = sheet.all_cells[src_row as usize][src_col as usize].value.to_string();
+                        if(sheet.all_cells[start_row as usize][start_col as usize].is_error == true){
+                            value="1/0".to_string();
+                         }
 
                         // Clear the source cell
                         let clear_formula = "0";
@@ -389,7 +398,10 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
                         let dest_col = dest_start_col + c;
 
                         // Get the value/formula from the source cell
-                        let value = sheet.all_cells[src_row as usize][src_col as usize].value.to_string();
+                        let mut value = sheet.all_cells[src_row as usize][src_col as usize].value.to_string();
+                        if(sheet.all_cells[start_row as usize][start_col as usize].is_error == true){
+                            value="1/0".to_string();
+                         }
 
                         // Assign the value/formula to the destination cell
                         if let Ok(parsed_formula) = parse_formula(&value) {
@@ -515,6 +527,12 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
             }
 
             "forecast" => {
+                if parts.len() != 5 {
+                    eprintln!("Invalid format. Expected: plot_scatter <x_range> <y_range> <filename>");
+                    STATUS_extension = 1;
+                    return;
+                }
+
                 println!("enterde into foreacst");
                 let forecast_len = string_to_int(parts[1]);
 

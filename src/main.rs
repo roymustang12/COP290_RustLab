@@ -202,6 +202,7 @@ fn main() {
                 let mut input = input_text.lock().unwrap();
                 if input.is_empty() {
                     // If no input, release the lock and sleep briefly to avoid busy-waiting
+                    display_sheet(&sheet.lock().unwrap(), &shared_data,&current_row,&current_col);
                     drop(input);
                     std::thread::sleep(std::time::Duration::from_millis(100));
                     continue;
