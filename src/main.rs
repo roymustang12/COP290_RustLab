@@ -18,11 +18,12 @@ use rust_lab::parser_visual_mode::string_to_int;
 // use rust_lab::input::parse_input;
 use rust_lab::expression_utils::parse_formula;
 use rust_lab::expression_parser::Expr;
-use rust_lab::graph_extension::{assign_cell_extension, UndoRedoStack,perform_undo,perform_redo};
+use rust_lab::graph_extension::assign_cell_extension;
 use rust_lab::graph_extension::initialise_extension;
 use rust_lab::graph_extension::STATUS_extension;
 use rust_lab::parser_visual_mode::parser_visual;
 use rust_lab::read_mode::handle_read_command;
+use rust_lab::graph_extension::UndoRedoStack;
 
 
 const MAX_ROWS: i32 = 999;
@@ -48,10 +49,14 @@ enum ModeOfSpreadsheet {
 
 
 
-fn parser_normal(input: &str, rows: i32, cols: i32, current_row: &Arc<Mutex<usize>>, current_col: &Arc<Mutex<usize>>) {
-    let mut count: i32 = 1;
-    let split_index = input.find(|c: char| !c.is_digit(10)).unwrap_or(0);
-    let (num, cmd) = input.split_at(split_index);
+fn parser_normal(input: &str, rows: i32, cols: i32) {
+    unsafe {
+        let mut count = 1;
+        let mut command = input;
+
+        // Split the input into numeric prefix and the rest of the string
+        let split_index = input.find(|c: char| !c.is_digit(10)).unwrap_or(0);
+        let (num, cmd) = input.split_at(split_index);
 
     if !num.is_empty() {
         count = num.parse::<i32>().unwrap_or(1);
@@ -164,169 +169,140 @@ fn main() {
         process::exit(1);
     }
 
-    let sheet = Arc::new(Mutex::new(initialise_extension(rows, columns))); // Wrap the sheet
-    let undo_manager = Arc::new(Mutex::new(UndoRedoStack::new())); // Wrap the undo_manager in Arc<Mutex<>>
+    let mut sheet = initialise_extension(rows as i32, columns as i32);
 
-    let shared_data = Arc::new(Mutex::new(vec![vec![String::new(); columns as usize]; rows as usize]));
-    let input_text = Arc::new(Mutex::new(String::new()));
-    let status_extension = Arc::new(Mutex::new(0)); // Shared status variable
-    let current_row = Arc::new(Mutex::new(0)); // Starting row of the visible portion
-    let current_col = Arc::new(Mutex::new(0)); // Starting column of the visible portion
 
+    let mut input = String::new();
+    let mut status_str = String::new();
+    let mut execution_time = 0.0;
+    let mut print_flag = true;
     
-    // Launch the GUI on the main thread
-    rust_lab::display::launch_gui(
-        shared_data.clone(), // Pass the shared data
-        sheet.clone(), // Pass the sheet
-        input_text.clone(),
-        status_extension.clone(),
-        current_row.clone(),
-        current_col.clone(),
-        undo_manager.clone(), // Pass the undo_manager
-    );
-    display_sheet( &sheet.lock().unwrap(), &shared_data,&current_row,&current_col);
-
-    // Process input in a separate thread
-    let input_processing_thread = {
-        let shared_data = shared_data.clone();
-        let input_text = input_text.clone();
-        let status_extension = status_extension.clone();
-        std::thread::spawn(move || {
-            let mut status_str = String::new();
-            let mut execution_time = 0.0;
-            let mut print_flag = true;
-
-            loop {
-              
-
-                let mut input = input_text.lock().unwrap();
-                if input.is_empty() {
-                    // If no input, release the lock and sleep briefly to avoid busy-waiting
-                    display_sheet(&sheet.lock().unwrap(), &shared_data,&current_row,&current_col);
-                    drop(input);
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    continue;
+    let shared_data = Arc::new(Mutex::new(Vec::new()));
+    rust_lab::display::launch_gui(shared_data.clone());
+    display_sheet(&sheet, &shared_data);
+    loop {
+        // let mut operation_id: i32 = 0;
+        // let mut edit_row: i32 = 0;
+        // let mut edit_column: i32 = 0;
+        // let mut count_operands: i32 = 0;
+        // let mut formula: Vec<Operand> = vec![];
+        unsafe {
+            status_str = match STATUS_extension {
+                0 => "ok".to_string(),
+                1 => {
+                    STATUS_extension = 0;
+                    "Invalid Input".to_string()
                 }
+                2 => {
+                    STATUS_extension = 0;
+                    "ok".to_string()
+                }
+                3 => {
+                    STATUS_extension = 0;
+                    "cyclic dependence".to_string()
+                }
+                _ => "unknown status".to_string(),
+            };
 
-                let command = input.clone();
-                *input = String::new(); // Clear the input after reading
-                drop(input); // Release the lock
+            print!("[{:.1}] ({}) > ", execution_time, status_str);
+            io::stdout().flush().unwrap();
 
-                unsafe {
-                  
-                    status_str = match STATUS_extension {
-                        0 => "ok".to_string(),
-                        1 => {
-                            STATUS_extension = 0;
-                            "Invalid Input".to_string()
-                        }
-                        2 => {
-                            STATUS_extension = 0;
-                            "ok".to_string()
-                        }
-                        3 => {
-                            STATUS_extension = 0;
-                            "cyclic dependence".to_string()
-                        }
-                        _ => "unknown status".to_string(),
-                    };
+            input.clear();
+            io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim();
 
                     let start = Instant::now();
 
-                    match command.as_str() {
-                        "q" => break,
-                        "undo" => {perform_undo(&mut sheet.lock().unwrap(),&mut undo_manager.lock().unwrap());},
-                        "redo" =>{ perform_redo(&mut sheet.lock().unwrap(),&mut undo_manager.lock().unwrap());},
-                        "read" => CURRENT_MODE = ModeOfSpreadsheet::READ,
-                        "insert" => CURRENT_MODE = ModeOfSpreadsheet::INSERT,
-                        "normal" => CURRENT_MODE = ModeOfSpreadsheet::NORMAL,
-                        "visual" => CURRENT_MODE = ModeOfSpreadsheet::VISUAL,
-                        "w" => {
-                                let mut dr = current_row.lock().unwrap();
-                                *dr = if (*dr as i32 - 24 < 0) { 0 } else { *dr - 24 };
-                            }
-                            "s" => {
-                                let mut dr = current_row.lock().unwrap();
-                                *dr = if *dr + 24 > rows as usize{
-                                    *dr // No change if exceeding
-                                } else if *dr + 48 > rows as usize {
-                                    rows as usize  - 24
-                                } else {
-                                    *dr + 24
-                                };
-                            }
-                            "a" => {
-                                let mut dc = current_col.lock().unwrap();
-                                *dc = if *dc as i32 - 15 < 0 { 0 } else { *dc - 15 };
-                            }
-                            "d" => {
-                                let mut dc = current_col.lock().unwrap();
-                                *dc = if *dc + 15 > columns as usize {
-                                    *dc // No change if exceeding
-                                } else if *dc + 30 > columns as usize {
-                                    columns as usize  - 15
-                                } else {
-                                    *dc + 15
-                                };
-                            }
-                        "disable_output" => print_flag = false,
-                        "enable_output" => print_flag = true,
-                        _ if command.starts_with("scroll_to ") => {
-                            let mut new_row = 0;
-                            let mut new_col = 0;
-                            parse_cell_name(&command[10..], &mut new_row, &mut new_col);
-                            if new_row < rows && new_col < columns {
-                                let mut dr = current_row.lock().unwrap();
-                                *dr = new_row as usize;
-                                let mut dc = current_col.lock().unwrap();
-                                *dc =new_col as usize;
-                                DISPLAY_ROW = 0;
-                                DISPLAY_COLUMN = 0;
-                            } else {
-                                eprintln!("Out of bounds rows or columns");
+            match input {
+                "q" => break,
+                "read" => CURRENT_MODE = ModeOfSpreadsheet::READ,
+                "insert" => CURRENT_MODE = ModeOfSpreadsheet::INSERT,
+                "normal" => CURRENT_MODE = ModeOfSpreadsheet::NORMAL,
+                "visual" => CURRENT_MODE = ModeOfSpreadsheet::VISUAL,
+                "disable_output" => print_flag = false,
+                "enable_output" => print_flag = true,
+                "w" =>if(CURRENT_ROW -10 < 0){CURRENT_ROW=0;}else{CURRENT_ROW = CURRENT_ROW - 10;},
+                "s" => 
+                    if(CURRENT_ROW+10 >rows){
+                        CURRENT_ROW=CURRENT_ROW;
+                    }
+                    else if(CURRENT_ROW+20>rows){
+                        CURRENT_ROW=rows-10;
+                    }
+                    else{
+                        CURRENT_ROW=CURRENT_ROW+10;
+                    },
+                "a" =>  if(CURRENT_COL-10 < 0){
+                            CURRENT_COL=0;
+                        }
+                        else{
+                            CURRENT_COL=CURRENT_COL-10;
+                        },
+                "d" => if(CURRENT_COL+10 >columns){
+                            CURRENT_COL=CURRENT_COL;
+                        }
+                        else if(CURRENT_COL+20>columns){
+                            CURRENT_COL=columns-10;
+                        }
+                        else{
+                            CURRENT_COL=CURRENT_COL+10;
+                        },
+                _ if input.starts_with("scroll_to ") => {
+                    let mut new_row = 0;
+                    let mut new_col = 0;
+                    parse_cell_name(&input[10..], &mut new_row, &mut new_col);
+                    if new_row < rows && new_col < columns {
+                        CURRENT_ROW = new_row;
+                        CURRENT_COL = new_col;
+                        DISPLAY_ROW = 0;
+                        DISPLAY_COLUMN = 0;
+                    } else {
+                        eprintln!("Out of bounds rows or columns");
+                    }
+                }
+                _ => 
+                    match CURRENT_MODE {
+                        ModeOfSpreadsheet::READ => {handle_read_command( input, &mut sheet);},
+
+                        ModeOfSpreadsheet::NORMAL => {parser_normal(input, rows, columns);},
+
+                        ModeOfSpreadsheet::INSERT => {
+                            // Call parse_input and assign_cell_extension for INSERT mode
+                            let parts: Vec<&str> = input.split('=').collect();
+                            if parts.len() != 2 {
+                                eprintln!("Invalid input format. Expected 'cell_name=expression'.");
                                 STATUS_extension = 1;
+                                continue;
+                            }
+                            let cell_name = parts[0].trim();
+                            let expression = parts[1].trim();
+                            let mut edit_r = 0;
+                            let mut edit_col = 0;
+                            parse_cell_name(cell_name, &mut edit_r, &mut edit_col);
+    
+                            match parse_formula(expression) {
+                                Ok(parsed_formula) => {
+                                    let expr = *parsed_formula;
+                                    if STATUS_extension != 1 {
+                                        assign_cell_extension(&mut sheet, edit_r, edit_col, expr);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error parsing formula: {}", e);
+                                    STATUS_extension = 1;
+                                }
                             }
                         }
-                        _ => match CURRENT_MODE {
-                            ModeOfSpreadsheet::READ => {handle_read_command(&command,&mut sheet.lock().unwrap(), &mut undo_manager.lock().unwrap());},
-                            ModeOfSpreadsheet::NORMAL => {parser_normal(&command, rows, columns, &current_row, &current_col);},
-                            ModeOfSpreadsheet::INSERT => {
-                                let parts: Vec<&str> = command.split('=').collect();
-                                if parts.len() != 2 {
-                                    // eprintln!("Invalid input format. Expected 'cell_name=expression'.");
-                                    STATUS_extension = 1;
-                                    let mut status = status_extension.lock().unwrap();
-                                    *status = STATUS_extension; 
-                                    continue;
-                                }
-                                let cell_name = parts[0].trim();
-                                let expression = parts[1].trim();
-                                let mut edit_r = 0;
-                                let mut edit_col = 0;
-                                parse_cell_name(cell_name, &mut edit_r, &mut edit_col);
+                        ModeOfSpreadsheet::VISUAL => {
+                            // Handle VISUAL mode commands (e.g., copy, paste)
+                            parser_visual(input, &mut sheet);
+                        }
+                },
+                    
+            
+            }
 
-                                match parse_formula(expression) {
-                                    Ok(parsed_formula) => {
-                                        let expr = *parsed_formula;
-                                        if STATUS_extension != 1 {
-                                            assign_cell_extension(&mut sheet.lock().unwrap(),&mut undo_manager.lock().unwrap() ,edit_r, edit_col, expr);
-                                        }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Error parsing formula: {}", e);
-                                        STATUS_extension = 1;
-                                    }
-                                }
-                            }
-                            ModeOfSpreadsheet::VISUAL => parser_visual(&command, &mut sheet.lock().unwrap(), &mut undo_manager.lock().unwrap()),
-                        },
-                    }
-
-                    let mut status = status_extension.lock().unwrap();
-                    *status = STATUS_extension; 
-
-                   
-                    execution_time = start.elapsed().as_secs_f64();
+            execution_time = start.elapsed().as_secs_f64();
 
                     if print_flag {
                         display_sheet(&sheet.lock().unwrap(), &shared_data,&current_row,&current_col);

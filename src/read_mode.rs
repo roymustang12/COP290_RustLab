@@ -20,7 +20,7 @@ use std::path::Path;
 /// * Supports flexible row lengths in the CSV file.
 /// * Handles formula cells (starting with `=`) by parsing and assigning them.
 /// 
-pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension,undo_manager: &mut UndoRedoStack) -> Result<(), Box<dyn Error>> {
+pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension) -> Result<(), Box<dyn Error>> {
     let path = Path::new(filename);
     
     
@@ -62,7 +62,7 @@ pub fn read_csv_file(filename: &str, sheet: &mut SpreadsheetExtension,undo_manag
                 match parse_formula(&cell_value[1..]) {
                     Ok(expr) => {
                         
-                       assign_cell_extension(sheet,undo_manager ,row_num as i32, col_num as i32, *expr);
+                       assign_cell_extension(sheet, row_num as i32, col_num as i32, *expr);
                     },
                     Err(_) => {
                         // Invalid formula, treat as text or number
@@ -119,7 +119,7 @@ fn store_cell_value(sheet: &mut SpreadsheetExtension, row: usize, col: usize, va
 /// * `true` if the command is successfully executed.
 /// * `false` if the command is invalid or an error occurs.
 ///
-pub fn handle_read_command(cmd: &str, sheet: &mut SpreadsheetExtension,undo_manager: &mut UndoRedoStack) -> bool {
+pub fn handle_read_command(cmd: &str, sheet: &mut SpreadsheetExtension) -> bool {
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     
     if parts.len() != 2 || parts[0] != "read" {
@@ -127,7 +127,7 @@ pub fn handle_read_command(cmd: &str, sheet: &mut SpreadsheetExtension,undo_mana
     }
     
     let filename = parts[1];
-    match read_csv_file(filename, sheet,undo_manager) {
+    match read_csv_file(filename, sheet) {
         Ok(_) => true,
         Err(e) => {
             println!("Error reading CSV file: {}", e);

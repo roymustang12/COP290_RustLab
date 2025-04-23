@@ -296,7 +296,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
                  }
 
                 if let Ok(parsed_formula) = parse_formula(&value) {
-                    assign_cell_extension(sheet,undo_manager,end_row, end_col, *parsed_formula);
+                    assign_cell_extension(sheet, end_row, end_col, *parsed_formula);
                 }
 
                
@@ -353,7 +353,7 @@ pub fn parser_visual(input: &str, sheet: &mut SpreadsheetExtension, undo_manager
 
                         // Assign the value/formula to the destination cell
                         if let Ok(parsed_formula) = parse_formula(&value) {
-                            assign_cell_extension(sheet,undo_manager,dest_row, dest_col, *parsed_formula);
+                            assign_cell_extension(sheet, dest_row, dest_col, *parsed_formula);
                         }
                     }
                 }
