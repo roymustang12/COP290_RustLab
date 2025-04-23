@@ -575,10 +575,10 @@ impl UndoRedoStack{
 
     pub fn push_state(&mut self, state: CellState) {
         self.undo_stack.push(state);
-        if self.redo_stack.len() > MAX_UNDO {
-            self.redo_stack.clear();
-        }
-        self.redo_stack.clear();
+    
+            // self.redo_stack.clear();
+        
+        // self.redo_stack.clear();
 
         if self.undo_stack.len() > MAX_UNDO {
             self.undo_stack.remove(0);
