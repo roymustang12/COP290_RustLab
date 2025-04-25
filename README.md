@@ -1,6 +1,6 @@
 # COP290_RustLab
 Project in Rust for COP290 
---For RHEL-based systems (Ubuntu, Debian, etc.):
+## For RHEL-based systems (Ubuntu, Debian, etc.):
 
 sudo apt-get update && sudo apt-get install libx11-dev libpango1.0-dev libxinerama-dev libxft-dev libxcursor-dev
 
