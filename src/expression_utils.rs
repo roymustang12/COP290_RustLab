@@ -1,10 +1,9 @@
 use crate::cell_extension::SpreadsheetExtension;
-use crate::cellsp::{CellReference};
-use crate::graph_extension::STATUS_extension;
-use std::str;
+use crate::cellsp::CellReference;
 use crate::expression_parser::Expr;
 use crate::formula::FormulaParser;
-
+use crate::graph_extension::STATUS_EXTENSION;
+use std::str;
 
 /// Parses a formula string into an expression.
 ///
@@ -14,13 +13,12 @@ use crate::formula::FormulaParser;
 /// # Returns
 /// * `Ok(Box<Expr>)` - The parsed expression if successful.
 /// * `Err(String)` - An error message if parsing fails.
-
 pub fn parse_formula(input: &str) -> Result<Box<Expr>, String> {
     let parser = FormulaParser::new();
-    parser.parse(input)
+    parser
+        .parse(input)
         .map_err(|e| format!("Parse error: {:?}", e))
 }
-
 
 /// Recursively extracts precedents (cell references) from an expression.
 ///
@@ -31,39 +29,34 @@ pub fn parse_formula(input: &str) -> Result<Box<Expr>, String> {
 /// # Behavior
 /// This function traverses the expression tree and collects all cell references
 /// (e.g., `A1`, `B2`) and ranges (e.g., `A1:B2`) into the accumulator.
-
 pub fn extract_precedents_helper(expr: &Expr, acc: &mut Vec<CellReference>) {
     match expr {
-        Expr::Number(_) => {
-
-        },
+        Expr::Number(_) => {}
 
         Expr::Cell(cell_ref) => {
             acc.push(cell_ref.clone());
-        },
+        }
 
-        Expr::BinaryOp(left,_ ,right) => {
+        Expr::BinaryOp(left, _, right) => {
             extract_precedents_helper(left, acc);
             extract_precedents_helper(right, acc);
-        },
+        }
 
         Expr::Function(_, precedents) => {
             for prec in precedents {
                 extract_precedents_helper(prec, acc);
             }
-        },
+        }
 
-        Expr::Range(start,end ) => {
+        Expr::Range(start, end) => {
             for r in start.row..=end.row {
                 for c in start.column..=end.column {
                     acc.push(CellReference { row: r, column: c });
                 }
             }
         }
-
     }
 }
-
 
 /// Extracts all precedents (cell references) from an expression.
 ///
@@ -94,45 +87,34 @@ pub fn extract_precedents(expr: &crate::expression_parser::Expr) -> Vec<CellRefe
 /// * Returns `0` for invalid operations or division by zero.
 pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
     match expr {
-        Expr::Number(value) => {
-            *value
-        },
+        Expr::Number(value) => *value,
 
         Expr::Cell(cell_ref) => {
             sheet.all_cells[cell_ref.row as usize][cell_ref.column as usize].value
-        },
+        }
 
         Expr::BinaryOp(left, op, right) => {
             match op {
-                '+' => {
-                    eval_expr(left, sheet) + eval_expr(right, sheet)
-                },
-                '-' => {
-                    eval_expr(left, sheet) - eval_expr(right, sheet)
-                },
-                '*' => {
-                    eval_expr(left, sheet) * eval_expr(right, sheet)
-                },
+                '+' => eval_expr(left, sheet) + eval_expr(right, sheet),
+                '-' => eval_expr(left, sheet) - eval_expr(right, sheet),
+                '*' => eval_expr(left, sheet) * eval_expr(right, sheet),
                 '/' => {
                     let divisor = eval_expr(right, sheet);
                     if divisor == 0 {
                         unsafe {
-                            STATUS_extension = 2; // Error status for division by zero
+                            STATUS_EXTENSION = 2; // Error status for division by zero
                         }
                         0 // Return 0 for division by zero
                     } else {
                         eval_expr(left, sheet) / divisor
                     }
-                },
-                _ => {
-                    unsafe {
-                        STATUS_extension = 12;
-                        panic!("Not a valid binary operation");
-                    }
-                    0
                 }
+                _ => unsafe {
+                    STATUS_EXTENSION = 12;
+                    panic!("Not a valid binary operation");
+                },
             }
-        },
+        }
 
         Expr::Function(name, args) => {
             match name.as_str() {
@@ -143,20 +125,20 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                             Expr::Range(start, end) => {
                                 for r in start.row..=end.row {
                                     for c in start.column..=end.column {
-                                        let cell_ref = CellReference { row: r, column: c };
+                                        // let cell_ref = CellReference { row: r, column: c };
                                         sum += sheet.all_cells[r as usize][c as usize].value;
                                     }
                                 }
-                            },
+                            }
                             _ => sum += eval_expr(arg, sheet),
                         }
                     }
                     sum
-                },
-                
+                }
+
                 "MAX" | "Max" => {
                     let mut values = Vec::new();
-                    
+
                     for arg in args {
                         match arg {
                             Expr::Range(start, end) => {
@@ -165,21 +147,21 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                                         values.push(sheet.all_cells[r as usize][c as usize].value);
                                     }
                                 }
-                            },
+                            }
                             _ => values.push(eval_expr(arg, sheet)),
                         }
                     }
-                    
+
                     if values.is_empty() {
                         0
                     } else {
                         *values.iter().max().unwrap_or(&0)
                     }
-                },
-                
+                }
+
                 "MIN" | "Min" => {
                     let mut values = Vec::new();
-                    
+
                     for arg in args {
                         match arg {
                             Expr::Range(start, end) => {
@@ -188,21 +170,21 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                                         values.push(sheet.all_cells[r as usize][c as usize].value);
                                     }
                                 }
-                            },
+                            }
                             _ => values.push(eval_expr(arg, sheet)),
                         }
                     }
-                    
+
                     if values.is_empty() {
                         0
                     } else {
                         *values.iter().min().unwrap_or(&0)
                     }
-                },
-                
+                }
+
                 "AVG" | "Avg" => {
                     let mut values = Vec::new();
-                    
+
                     for arg in args {
                         match arg {
                             Expr::Range(start, end) => {
@@ -211,21 +193,21 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                                         values.push(sheet.all_cells[r as usize][c as usize].value);
                                     }
                                 }
-                            },
+                            }
                             _ => values.push(eval_expr(arg, sheet)),
                         }
                     }
-                    
+
                     if values.is_empty() {
                         0
                     } else {
                         values.iter().sum::<i32>() / values.len() as i32
                     }
-                },
-                
+                }
+
                 "STDEV" | "Stdev" => {
                     let mut values = Vec::new();
-                    
+
                     for arg in args {
                         match arg {
                             Expr::Range(start, end) => {
@@ -234,56 +216,55 @@ pub fn eval_expr(expr: &Expr, sheet: &SpreadsheetExtension) -> i32 {
                                         values.push(sheet.all_cells[r as usize][c as usize].value);
                                     }
                                 }
-                            },
+                            }
                             _ => values.push(eval_expr(arg, sheet)),
                         }
                     }
-                    
+
                     if values.is_empty() {
                         0
                     } else {
                         // Calculate mean
                         let n = values.len() as f64;
                         let mean: f64 = values.iter().map(|&x| x as f64).sum::<f64>() / n;
-                        
+
                         // Calculate variance
-                        let variance = values.iter()
+                        let variance = values
+                            .iter()
                             .map(|&x| {
                                 let diff = (x as f64) - mean;
                                 diff * diff
                             })
-                            .sum::<f64>() / n;
-                        
+                            .sum::<f64>()
+                            / n;
+
                         // Return standard deviation as integer
                         variance.sqrt() as i32
                     }
-                },
-                
+                }
+
                 "SLEEP" | "Sleep" => {
                     if let Some(arg) = args.first() {
-                        let duration = eval_expr(arg, sheet);
-                        duration
+                        eval_expr(arg, sheet)
                     } else {
                         0
                     }
-                },
-                
+                }
+
                 _ => {
                     unsafe {
-                        STATUS_extension = 1;
+                        STATUS_EXTENSION = 1;
                     }
                     0
                 }
             }
-        },
-        
+        }
+
         Expr::Range(_, _) => {
             unsafe {
-                STATUS_extension = 1;
+                STATUS_EXTENSION = 1;
             }
             0
         }
     }
 }
-
-

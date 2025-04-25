@@ -1,26 +1,6 @@
 use plotters::prelude::*;
 use plotters::style::{BLACK, BLUE, RED, WHITE};
-use plotters::coord::types::RangedCoordf64;
-const GRAY: RGBColor = RGBColor(169, 169, 169); 
-/// Generates cell names (e.g., A1, A2, ...) for a given column and range of rows.
-///
-/// # Arguments
-/// * `start_row` - The starting row index (0-based).
-/// * `col` - The column index (0-based).
-/// * `count` - The number of cell names to generate.
-///
-/// # Returns
-/// A vector of strings representing the generated cell names.
-///
-fn generate_cell_names(start_row: usize, col: usize, count: usize) -> Vec<String> {
-    let mut names = Vec::new();
-    for i in 0..count {
-        let col_char = ((b'A' + col as u8) as char).to_string(); // Simple case: single letter col
-        names.push(format!("{}{}", col_char, start_row + i + 1));
-    }
-    names
-}
-
+const GRAY: RGBColor = RGBColor(169, 169, 169);
 
 /// Plots a histogram for the given data and saves it to a file.
 ///
@@ -69,19 +49,13 @@ pub fn plot_histogram(data: &[f64], filename: &str) -> Result<(), Box<dyn std::e
         .axis_desc_style(("sans-serif", 15))
         .draw()?;
 
-    chart.draw_series(
-        frequencies.iter().enumerate().map(|(i, &count)| {
-            Rectangle::new(
-                [(i, 0), (i + 1, count)],
-                BLUE.filled().stroke_width(1),
-            )
-        }),
-    )?;
+    chart.draw_series(frequencies.iter().enumerate().map(|(i, &count)| {
+        Rectangle::new([(i, 0), (i + 1, count)], BLUE.filled().stroke_width(1))
+    }))?;
 
     root.present()?; // Save the file
     Ok(())
 }
-
 
 /// Plots a line graph for the given data and saves it to a file.
 ///
@@ -92,10 +66,6 @@ pub fn plot_histogram(data: &[f64], filename: &str) -> Result<(), Box<dyn std::e
 /// # Returns
 /// * `Ok(())` if the line graph is successfully generated.
 /// * `Err` if an error occurs (e.g., empty data or file write failure).
-
-
-
-
 pub fn plot_line(data: &[Vec<f64>], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     if data.is_empty() || data.iter().all(|col| col.is_empty()) {
         return Err("No data to plot".into());
@@ -125,35 +95,31 @@ pub fn plot_line(data: &[Vec<f64>], filename: &str) -> Result<(), Box<dyn std::e
 
     chart.configure_mesh().draw()?;
 
+    let colors = [&BLUE, &RED, &GREEN, &CYAN, &MAGENTA, &BLACK, &YELLOW, &GRAY];
 
-    let colors = [
-        &BLUE, &RED, &GREEN, &CYAN, &MAGENTA, &BLACK, &YELLOW, &GRAY,
-    ];
-    
     // Plot each column as a line series
     for (i, column) in data.iter().enumerate() {
         let color = colors[i % colors.len()];
 
         // Draw the line series for each column
-        chart.draw_series(LineSeries::new(
-            column.iter().enumerate().map(|(x, y)| (x as i32, *y)),
-            color,
-        ))?
-        .label(format!("Col {}", i + 1))
-        .legend(move |(x, y)| PathElement::new([(x, y), (x + 20, y)], color));
+        chart
+            .draw_series(LineSeries::new(
+                column.iter().enumerate().map(|(x, y)| (x as i32, *y)),
+                color,
+            ))?
+            .label(format!("Col {}", i + 1))
+            .legend(move |(x, y)| PathElement::new([(x, y), (x + 20, y)], color));
     }
 
     // Configure and draw the legend
     chart
         .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
+        .background_style(WHITE.mix(0.8))
+        .border_style(BLACK)
         .draw()?;
 
     Ok(())
 }
-
-
 
 /// Plots a scatter plot for the given x and y data and saves it to a file.
 ///
@@ -166,7 +132,11 @@ pub fn plot_line(data: &[Vec<f64>], filename: &str) -> Result<(), Box<dyn std::e
 /// * `Ok(())` if the scatter plot is successfully generated.
 /// * `Err` if an error occurs (e.g., mismatched lengths of x and y data or file write failure).
 ///
-pub fn plot_scatter(x: &[f64], y: &[f64], filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn plot_scatter(
+    x: &[f64],
+    y: &[f64],
+    filename: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     if x.len() != y.len() {
         return Err("x and y vectors must be the same length".into());
     }
@@ -202,7 +172,9 @@ pub fn plot_scatter(x: &[f64], y: &[f64], filename: &str) -> Result<(), Box<dyn 
         .draw()?;
 
     chart.draw_series(
-        x.iter().zip(y.iter()).map(|(&x, &y)| Circle::new((x, y), 4, RED.filled())),
+        x.iter()
+            .zip(y.iter())
+            .map(|(&x, &y)| Circle::new((x, y), 4, RED.filled())),
     )?;
 
     Ok(())

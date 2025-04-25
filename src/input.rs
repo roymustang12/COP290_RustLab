@@ -1,34 +1,28 @@
-use crate::cellsp::{CellReference, Operand};
+use crate::cellsp2::{CellReference, Operand};
 
-// #[derive(Clone)]
-// struct Cell{
-//  value: i32,
-// }
-
-// struct Sheet{
-//     all_cells: Vec<Vec<Cell>>,
-// }
-
-// #[derive(Clone)]
-// enum OperandValue{
-//     Constant(i32),
-//     CellOperand(Cell),
-// }
-
-// #[derive(Clone)]
-// struct Operand{
-//     type_flag: i32,
-//     operand_value: OperandValue,
-// }
-
-// Global variables
-// static mut dependency_graph_final::STATUS: i32 = 0;
-
+/// Checks if a string contains any alphabetic characters.
+///
+/// # Arguments
+///
+/// * `s` - A string slice to check.
+///
+/// # Returns
+///
+/// `true` if the string contains any alphabetic characters, otherwise `false`.
 fn contains_alphabet(s: &str) -> bool {
     s.chars().any(|c| c.is_alphabetic())
 }
 
-fn string_to_int(num_str: &str) -> i32 {
+/// Converts a string representation of an integer to an `i32`.
+///
+/// # Arguments
+///
+/// * `num_str` - A string slice representing the integer.
+///
+/// # Returns
+///
+/// The integer value of the string. If the string is invalid, it sets a global status flag.
+pub fn string_to_int(num_str: &str) -> i32 {
     let mut num = 0;
     let mut i = 0;
     let mut sign = 1;
@@ -45,7 +39,7 @@ fn string_to_int(num_str: &str) -> i32 {
     }
     while i < chars.len() {
         let digit = chars[i] as i32 - '0' as i32;
-        if digit < 0 || digit > 9 {
+        if !(0..=9).contains(&digit) {
             unsafe {
                 crate::dependency_graph_final::STATUS = 1;
             }
@@ -58,11 +52,29 @@ fn string_to_int(num_str: &str) -> i32 {
     num * sign
 }
 
-// Count occurrences of a character in a string
+/// Counts the occurrences of a specific character in a string.
+///
+/// # Arguments
+///
+/// * `ch` - The character to count.
+/// * `s` - The string slice to search.
+///
+/// # Returns
+///
+/// The number of times the character appears in the string.
 fn count_occurrences(ch: char, s: &str) -> i32 {
     s.chars().filter(|&c| c == ch).count() as i32
 }
 
+/// Determines if a string is an arithmetic expression.
+///
+/// # Arguments
+///
+/// * `expression` - A string slice representing the expression.
+///
+/// # Returns
+///
+/// `true` if the string contains arithmetic operators (`+`, `-`, `*`, `/`), otherwise `false`.
 fn is_arithmetic_expression(expression: &str) -> bool {
     expression.contains('+')
         || expression.contains('-')
@@ -70,7 +82,18 @@ fn is_arithmetic_expression(expression: &str) -> bool {
         || expression.contains('/')
 }
 
-pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
+/// Parses a cell name into its row and column indices.
+///
+/// # Arguments
+///
+/// * `cell_name` - The cell name as a string slice (e.g., "A1").
+/// * `row` - A mutable reference to store the row index.
+/// * `col` - A mutable reference to store the column index.
+///
+/// # Notes
+///
+/// If the cell name is invalid, it sets a global status flag.
+pub fn parse_cell_name_1(cell_name: &str, row: &mut i32, col: &mut i32) {
     let chars: Vec<char> = cell_name.chars().collect();
     let mut i = 0;
     *col = 0;
@@ -108,6 +131,15 @@ pub fn parse_cell_name(cell_name: &str, row: &mut i32, col: &mut i32) {
     }
 }
 
+/// Checks if a string represents a function.
+///
+/// # Arguments
+///
+/// * `expression` - A string slice representing the expression.
+///
+/// # Returns
+///
+/// `true` if the string contains a function name (e.g., "MIN(", "MAX("), otherwise `false`.
 fn is_function(expression: &str) -> bool {
     expression.contains("MIN(")
         || expression.contains("MAX(")
@@ -117,6 +149,15 @@ fn is_function(expression: &str) -> bool {
         || expression.contains("SLEEP(")
 }
 
+/// Assigns a numeric value to an arithmetic operator.
+///
+/// # Arguments
+///
+/// * `op` - The arithmetic operator (`+`, `-`, `*`, `/`).
+///
+/// # Returns
+///
+/// A numeric value corresponding to the operator. If the operator is invalid, it sets a global status flag.
 fn assign_value(op: char) -> i32 {
     match op {
         '+' => 3,
@@ -132,9 +173,27 @@ fn assign_value(op: char) -> i32 {
     }
 }
 
+/// Parses an input string and updates the spreadsheet accordingly.
+///
+/// # Arguments
+///
+/// * `input` - The input string to parse.
+/// * `_spreadsheet` - A mutable reference to the spreadsheet.
+/// * `rows` - The number of rows in the spreadsheet.
+/// * `cols` - The number of columns in the spreadsheet.
+/// * `operation_id` - A mutable reference to store the operation ID.
+/// * `edit_row` - A mutable reference to store the row index of the edited cell.
+/// * `edit_column` - A mutable reference to store the column index of the edited cell.
+/// * `count_operands` - A mutable reference to store the number of operands.
+/// * `formula` - A mutable reference to store the parsed formula.
+///
+/// # Notes
+///
+/// If the input is invalid, it sets a global status flag.
+#[allow(clippy::too_many_arguments)]
 pub fn parse_input(
     input: &str,
-    spreadsheet: &mut crate::cellsp::Spreadsheet,
+    _spreadsheet: &mut crate::cellsp2::Spreadsheet,
     rows: i32,
     cols: i32,
     operation_id: &mut i32,
@@ -155,7 +214,7 @@ pub fn parse_input(
     let expression = parts[1].trim();
     let mut edit_r = 0;
     let mut edit_col = 0;
-    parse_cell_name(cell_name, &mut edit_r, &mut edit_col);
+    parse_cell_name_1(cell_name, &mut edit_r, &mut edit_col);
     if edit_r < 0 || edit_r >= rows || edit_col < 0 || edit_col >= cols {
         unsafe {
             crate::dependency_graph_final::STATUS = 1;
@@ -168,23 +227,19 @@ pub fn parse_input(
     if expression
         .chars()
         .next()
-        .map_or(false, |c| c.is_digit(10) || c == '-' || c == '+')
-        || (expression
-            .chars()
-            .next()
-            .map_or(false, |c| c.is_alphabetic())
+        .is_some_and(|c| c.is_ascii_digit() || c == '-' || c == '+')
+        || (expression.chars().next().is_some_and(|c| c.is_alphabetic())
             && !expression.contains('('))
     {
         if !contains_alphabet(expression) && !is_arithmetic_expression(&expression[1..]) {
             *count_operands = 1;
-            let mut formula_vec = Vec::with_capacity(1);
-            formula_vec.push(Operand::Constant(string_to_int(expression)));
+            let formula_vec = vec![Operand::Constant(string_to_int(expression))];
             *formula = formula_vec;
             *operation_id = 1;
         } else if contains_alphabet(expression) && !is_arithmetic_expression(&expression[1..]) {
             let mut row1 = 0;
             let mut col1 = 0;
-            parse_cell_name(&expression, &mut row1, &mut col1);
+            parse_cell_name_1(expression, &mut row1, &mut col1);
             if row1 < 0 || row1 >= rows || col1 < 0 || col1 >= cols {
                 unsafe {
                     crate::dependency_graph_final::STATUS = 1;
@@ -192,11 +247,10 @@ pub fn parse_input(
                 return;
             }
             *count_operands = 1;
-            let mut formula_vec = Vec::with_capacity(1);
-            formula_vec.push(Operand::CellOperand(CellReference {
+            let formula_vec = vec![Operand::CellOperand(CellReference {
                 row: row1,
                 column: col1,
-            }));
+            })];
             *formula = formula_vec;
             *operation_id = 2;
         } else if (contains_alphabet(expression) && is_arithmetic_expression(&expression[1..]))
@@ -206,8 +260,7 @@ pub fn parse_input(
             let mut formula_vec = Vec::with_capacity(2);
 
             if !(expression.starts_with('+') || expression.starts_with('-')) {
-                let mut parts =
-                    expression.splitn(2, |c| c == '+' || c == '-' || c == '*' || c == '/');
+                let mut parts = expression.splitn(2, |c| ['+', '-', '*', '/'].contains(&c));
                 let operand1 = parts.next().unwrap_or("");
 
                 if let Some(rest) = parts.next() {
@@ -221,10 +274,10 @@ pub fn parse_input(
                         return;
                     }
 
-                    if operand1.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                    if operand1.chars().next().is_some_and(|c| c.is_alphabetic()) {
                         let mut r1 = 0;
                         let mut c1 = 0;
-                        parse_cell_name(operand1, &mut r1, &mut c1);
+                        parse_cell_name_1(operand1, &mut r1, &mut c1);
 
                         if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
                             unsafe { crate::dependency_graph_final::STATUS = 1 }
@@ -241,10 +294,10 @@ pub fn parse_input(
                         *operation_id = assign_value(op);
                     }
 
-                    if operand2.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                    if operand2.chars().next().is_some_and(|c| c.is_alphabetic()) {
                         let mut r1 = 0;
                         let mut c1 = 0;
-                        parse_cell_name(operand2, &mut r1, &mut c1);
+                        parse_cell_name_1(operand2, &mut r1, &mut c1);
 
                         if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
                             unsafe {
@@ -271,7 +324,7 @@ pub fn parse_input(
                 if expression
                     .chars()
                     .nth(1)
-                    .map_or(false, |c| c == '+' || c == '-')
+                    .is_some_and(|c| c == '+' || c == '-')
                 {
                     unsafe {
                         crate::dependency_graph_final::STATUS = 1;
@@ -282,19 +335,18 @@ pub fn parse_input(
                 let sign = expression.chars().next().unwrap();
                 let expr_without_sign = &expression[1..];
 
-                let mut parts =
-                    expr_without_sign.splitn(2, |c| c == '+' || c == '-' || c == '*' || c == '/');
+                let mut parts = expr_without_sign.splitn(2, |c| ['+', '-', '*', '/'].contains(&c));
                 let operand1 = parts.next().unwrap_or("");
 
                 if let Some(rest) = parts.next() {
                     let op = expr_without_sign.chars().nth(operand1.len()).unwrap_or('+');
                     let operand2 = rest;
 
-                    if operand1.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                    if operand1.chars().next().is_some_and(|c| c.is_alphabetic()) {
                         // // yahan konsa case handle ho raha tha ? like agar +A1 OPERAND .... HAI TO NEGATIVE KYUN NI CHECK KIYA ? +A1 valid tha ya nahin check akrna hai
                         // let mut r1 = 0;
                         // let mut c1 = 0;
-                        // parse_cell_name(operand1, &mut r1, &mut c1);
+                        // parse_cell_name_1(operand1, &mut r1, &mut c1);
 
                         // if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
                         //     unsafe {dependency_graph_final::STATUS = 1;}
@@ -320,10 +372,10 @@ pub fn parse_input(
                         *operation_id = assign_value(op);
                     }
 
-                    if operand2.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                    if operand2.chars().next().is_some_and(|c| c.is_alphabetic()) {
                         let mut r1 = 0;
                         let mut c1 = 0;
-                        parse_cell_name(operand2, &mut r1, &mut c1);
+                        parse_cell_name_1(operand2, &mut r1, &mut c1);
 
                         if r1 < 0 || r1 > rows || c1 < 0 || c1 > cols {
                             unsafe {
@@ -405,7 +457,7 @@ pub fn parse_input(
                 if contains_alphabet(range) {
                     let mut r3 = 0;
                     let mut c3 = 0;
-                    parse_cell_name(range, &mut r3, &mut c3);
+                    parse_cell_name_1(range, &mut r3, &mut c3);
 
                     if r3 < 0 || r3 > rows || c3 < 0 || c3 > cols {
                         unsafe {
@@ -436,7 +488,7 @@ pub fn parse_input(
                     let mut r4 = 0;
                     let mut c4 = 0;
 
-                    parse_cell_name(start, &mut r3, &mut c3);
+                    parse_cell_name_1(start, &mut r3, &mut c3);
 
                     if r3 < 0 || r3 > rows || c3 < 0 || c3 > cols {
                         unsafe {
@@ -445,7 +497,7 @@ pub fn parse_input(
                         return;
                     }
 
-                    parse_cell_name(end, &mut r4, &mut c4);
+                    parse_cell_name_1(end, &mut r4, &mut c4);
                     if r4 < 0 || r4 > rows || c4 < 0 || c4 > cols {
                         unsafe {
                             crate::dependency_graph_final::STATUS = 1;
@@ -493,83 +545,3 @@ pub fn parse_input(
         // println!("i was here 6");
     }
 }
-
-// fn main() {
-//     // Initialize a sample spreadsheet with 3x3 cells
-//     let mut spreadsheet = Sheet {
-//         all_cells: vec![
-//             vec![Cell { value: 1 }, Cell { value: 2 }, Cell { value: 3 }],
-//             vec![Cell { value: 4 }, Cell { value: 5 }, Cell { value: 6 }],
-//             vec![Cell { value: 7 }, Cell { value: 8 }, Cell { value: 9 }],
-//         ],
-//     };
-
-//     // Define test inputs
-//     let inputs = vec![
-//         "A1=5",                // Assign constant to a cell
-//         "A1=-5+2",              // Arithmetic expression
-//         "A1=+5-2",              // Arithmetic expression
-//         "A1=5*2",              // Arithmetic expression
-//         "A1=5/2",              // Arithmetic expression
-//         "B2=-A1+A2",               // Assign cell reference
-//         "C3=A1+B2",            // Arithmetic expression with cell references
-//         "C3=MIN(A1:B2)",       // Function with range
-//         "C3=MIN(A1::B2)",       // Function with range
-//         "C3=MIN(A1:b2)",       // Function with range
-//         "C3=MIN(A1:B2))",       // Function with range
-//         "C3=MIN(A1:B2",       // Function with range
-//         "C3=STDE(A1:B2)",       // Function with range
-//         "B2=1+A1A",               // Assign cell reference
-//         "B2=1+A1A1",               // Assign cell reference
-//         "B2=1+",               // Assign cell reference // SHOWING IT CORRECT
-//         "B2=1+A1+",               // Assign cell reference
-//         "B2=1+*A1",               // Assign cell reference
-//         "B2=SUM(A1)",               // Assign cell reference
-//         "B2=A1:B2+1",               // Assign cell reference
-//         "B2=A1(A2)",               // Assign cell reference
-//         "B2=B1+A",               // Assign cell reference
-//         "C2=SLEEP(10)",        // Function with constant
-//         "F6=INVALID_FUNCTION", // Invalid function
-//     ];
-
-//     // Iterate over inputs and parse them
-//     for input in inputs {
-//         println!("Processing input: {}", input);
-
-//         // Reset global variables
-//         unsafe {
-//             dependency_graph_final::STATUS = 0;
-//             *operation_id = 0;
-//             *count_operands = 0;
-//             *formula = None;
-//         }
-
-//         // Parse the input
-//         parse_input(input, &mut spreadsheet, 3, 3);
-
-//         // Print the results
-//         unsafe {
-//             println!("dependency_graph_final::STATUS: {}", dependency_graph_final::STATUS);
-//             println!("*operation_id: {}", *operation_id);
-//             println!("*count_operands: {}", *count_operands);
-
-//             if let Some(*formula) = &*formula {
-//                 println!("*formula:");
-//                 for operand in *formula {
-//                     match &operand.operand_value {
-//                         OperandValue::Constant(value) => {
-//                             println!("  Type: Constant, Value: {}", value);
-//                         }
-//                         OperandValue::CellOperand(cell) => {
-//                             println!("  Type: CellOperand, Value: {}", cell.value);
-//                         }
-//                     }
-//                 }
-//             } else {
-//                 println!("*formula: None");
-//             }
-//         }
-
-//         println!("-----------------------------------");
-//     }
-// }

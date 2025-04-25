@@ -1,39 +1,48 @@
-use crate::cellsp::{Cell, CellReference, Operand, Spreadsheet};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::mpsc::{self, Receiver, Sender};
+use crate::cellsp2::{Cell, CellReference, Operand, Spreadsheet};
+use lazy_static::lazy_static;
+use std::collections::{HashSet, VecDeque};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use lazy_static::lazy_static;
+type CellCoord = (i32, i32, i32);
+type ThreadSafeSender = Arc<Mutex<Sender<CellCoord>>>;
+type ThreadSafeReceiver = Arc<Mutex<Receiver<CellCoord>>>;
 
 lazy_static! {
-    static ref SLEEP_CHANNEL: (
-        Arc<Mutex<Sender<(i32, i32, i32)>>>,
-        Arc<Mutex<Receiver<(i32, i32, i32)>>>
-    ) = {
-        let (tx, rx) = mpsc::channel();
+    static ref SLEEP_CHANNEL: (ThreadSafeSender, ThreadSafeReceiver) = {
+        let (tx, rx) = channel::<CellCoord>();
         (Arc::new(Mutex::new(tx)), Arc::new(Mutex::new(rx)))
     };
 }
 
 pub static mut STATUS: i32 = 0;
 
+/// Initializes a spreadsheet with the given number of rows and columns.
+///
+/// # Arguments
+///
+/// * `rows` - The number of rows in the spreadsheet.
+/// * `columns` - The number of columns in the spreadsheet.
+///
+/// # Returns
+///
+/// A `Spreadsheet` instance with all cells initialized.
 pub fn initialise(rows: i32, columns: i32) -> Spreadsheet {
     let mut all_cells = Vec::with_capacity(rows as usize);
     for r in 0..rows {
         let mut row: Vec<Cell> = Vec::with_capacity(columns as usize);
         for c in 0..columns {
-            let curr_cell: Cell;
-            curr_cell = Cell {
+            let curr_cell = Cell {
                 value: 0,
                 operation_id: -1,
                 formula: Vec::new(),
-                r: r,
-                c: c,
+                r,
+                c,
                 is_recalculate: false,
                 is_error: false,
-                dependents: HashMap::new(),
-                precedents: HashMap::new(),
+                dependents: HashSet::new(),
+                precedents: HashSet::new(),
             };
 
             row.push(curr_cell);
@@ -48,6 +57,15 @@ pub fn initialise(rows: i32, columns: i32) -> Spreadsheet {
     }
 }
 
+/// Adds a dependency between two cells in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rf` - Row index of the precedent cell.
+/// * `cf` - Column index of the precedent cell.
+/// * `rt` - Row index of the dependent cell.
+/// * `ct` - Column index of the dependent cell.
 pub fn add_dependency(sheet: &mut Spreadsheet, rf: i32, cf: i32, rt: i32, ct: i32) {
     let dependent_cell = CellReference {
         row: rt,
@@ -59,12 +77,21 @@ pub fn add_dependency(sheet: &mut Spreadsheet, rf: i32, cf: i32, rt: i32, ct: i3
     };
     sheet.all_cells[rf as usize][cf as usize]
         .dependents
-        .insert(dependent_cell, true);
+        .insert(dependent_cell);
     sheet.all_cells[rt as usize][ct as usize]
         .precedents
-        .insert(precedent_cell, true);
+        .insert(precedent_cell);
 }
 
+/// Deletes a dependency between two cells in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rf` - Row index of the precedent cell.
+/// * `cf` - Column index of the precedent cell.
+/// * `rt` - Row index of the dependent cell.
+/// * `ct` - Column index of the dependent cell.
 pub fn delete_dependency(sheet: &mut Spreadsheet, rf: i32, cf: i32, rt: i32, ct: i32) {
     let dependent_cell = CellReference {
         row: rt,
@@ -76,11 +103,25 @@ pub fn delete_dependency(sheet: &mut Spreadsheet, rf: i32, cf: i32, rt: i32, ct:
         .remove(&dependent_cell);
 }
 
+/// Clears all precedents of a specific cell in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - Row index of the target cell.
+/// * `ct` - Column index of the target cell.
 pub fn clear_precedents(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
     let cell = &mut sheet.all_cells[rt as usize][ct as usize];
-    cell.precedents = HashMap::new();
+    cell.precedents = HashSet::new();
 }
 
+/// Calculates the value of a specific cell in the spreadsheet based on the formula specified.Before assigning the value,it checks if the update is to validated.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - Row index of the target cell.
+/// * `ct` - Column index of the target cell.
 pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
     // let cell = &mut sheet.all_cells[rt as usize][ct as usize];
     match sheet.all_cells[rt as usize][ct as usize].operation_id {
@@ -188,7 +229,6 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
                                 STATUS = 0;
                             }
                         }
-                        return;
                     }
                     _ => {}
                 }
@@ -225,7 +265,7 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             }
             let (values, is_error) =
                 collect_values(sheet, &sheet.all_cells[rt as usize][ct as usize].formula);
-            if is_error == true {
+            if is_error {
                 sheet.all_cells[rt as usize][ct as usize].is_error = true;
                 unsafe {
                     STATUS = 2;
@@ -264,7 +304,7 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             }
             let (values, is_error) =
                 collect_values(sheet, &sheet.all_cells[rt as usize][ct as usize].formula);
-            if is_error == true {
+            if is_error {
                 sheet.all_cells[rt as usize][ct as usize].is_error = true;
                 unsafe {
                     STATUS = 2;
@@ -303,7 +343,7 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             }
             let (values, is_error) =
                 collect_values(sheet, &sheet.all_cells[rt as usize][ct as usize].formula);
-            if is_error == true {
+            if is_error {
                 sheet.all_cells[rt as usize][ct as usize].is_error = true;
                 unsafe {
                     STATUS = 2;
@@ -342,7 +382,7 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             }
             let (values, is_error) =
                 collect_values(sheet, &sheet.all_cells[rt as usize][ct as usize].formula);
-            if is_error == true {
+            if is_error {
                 sheet.all_cells[rt as usize][ct as usize].is_error = true;
                 unsafe {
                     STATUS = 2;
@@ -381,7 +421,7 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             }
             let (values, is_error) =
                 collect_values(sheet, &sheet.all_cells[rt as usize][ct as usize].formula);
-            if is_error == true {
+            if is_error {
                 sheet.all_cells[rt as usize][ct as usize].is_error = true;
                 unsafe {
                     STATUS = 2;
@@ -421,32 +461,39 @@ pub fn calculate_cell_value(sheet: &mut Spreadsheet, rt: i32, ct: i32) {
             if let Operand::Constant(value) = &sheet.all_cells[rt as usize][ct as usize].formula[0]
             {
                 handle_sleep(rt, ct, *value);
-            } else {
-                if let Operand::CellOperand(cell_ref) =
-                    &sheet.all_cells[rt as usize][ct as usize].formula[0]
-                {
-                    let prcedent_cell =
-                        &sheet.all_cells[cell_ref.row as usize][cell_ref.column as usize];
-                    if prcedent_cell.is_error {
-                        sheet.all_cells[rt as usize][ct as usize].is_error = true;
-                        unsafe {
-                            STATUS = 2;
-                        }
-                    } else {
-                        let seconds =
-                            sheet.all_cells[cell_ref.row as usize][cell_ref.column as usize].value;
-                        handle_sleep(rt, ct, seconds);
+            } else if let Operand::CellOperand(cell_ref) =
+                &sheet.all_cells[rt as usize][ct as usize].formula[0]
+            {
+                let prcedent_cell =
+                    &sheet.all_cells[cell_ref.row as usize][cell_ref.column as usize];
+                if prcedent_cell.is_error {
+                    sheet.all_cells[rt as usize][ct as usize].is_error = true;
+                    unsafe {
+                        STATUS = 2;
                     }
+                } else {
+                    let seconds =
+                        sheet.all_cells[cell_ref.row as usize][cell_ref.column as usize].value;
+                    handle_sleep(rt, ct, seconds);
                 }
             }
         }
-
         _ => {
             panic!("Unknown operation");
         }
     }
 }
 
+/// Retrieves the value of an operand in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `operand` - The operand to evaluate.
+///
+/// # Returns
+///
+/// A tuple containing the value of the operand and a boolean indicating if there was an error.
 pub fn get_operand_value(sheet: &Spreadsheet, operand: &Operand) -> (i32, bool) {
     match operand {
         Operand::Constant(value) => (*value, false),
@@ -461,6 +508,16 @@ pub fn get_operand_value(sheet: &Spreadsheet, operand: &Operand) -> (i32, bool) 
     }
 }
 
+/// Collects values from a formula in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `formula` - A vector of operands representing the formula.
+///
+/// # Returns
+///
+/// A tuple containing a vector of values and a boolean indicating if there was an error.
 pub fn collect_values(sheet: &Spreadsheet, formula: &Vec<Operand>) -> (Vec<i32>, bool) {
     let mut is_error = false;
     let mut values = Vec::new();
@@ -474,26 +531,51 @@ pub fn collect_values(sheet: &Spreadsheet, formula: &Vec<Operand>) -> (Vec<i32>,
     (values, is_error)
 }
 
+/// Calculates the standard deviation of a vector of integers.
+///
+/// # Arguments
+///
+/// * `values` - A reference to a vector of integers.
+///
+/// # Returns
+///
+/// The standard deviation of the values as an integer. If the vector has one or fewer elements, it returns `0` to avoid division by zero.
+///
+/// # Notes
+///
+/// The calculation uses integer division for the mean and rounds the final standard deviation to the nearest integer.
 fn stdev(values: &Vec<i32>) -> i32 {
-    if values.is_empty() {
-        return 0;
+    let n = values.len();
+    if n <= 1 {
+        return 0; // Avoid division by zero
     }
 
-    let n = values.len() as f64;
-    let mean: f64 = values.iter().map(|&x| x as f64).sum::<f64>() / n;
+    // Calculate mean using integer division
+    let sum: i32 = values.iter().sum();
+    let mean = sum / n as i32;
 
-    let variance = values
-        .iter()
-        .map(|&x| {
-            let diff = (x as f64) - mean;
-            diff * diff
-        })
-        .sum::<f64>()
-        / n;
+    // Calculate variance
+    let mut variance = 0.0;
+    for &value in values {
+        variance += ((value - mean) * (value - mean)) as f64;
+    }
+    variance /= n as f64;
 
-    variance.sqrt() as i32
+    // Return integer standard deviation (rounded)
+    (variance.sqrt().round()) as i32
 }
 
+/// Handles a sleep operation for a specific cell.
+///
+/// # Arguments
+///
+/// * `row` - Row index of the target cell.
+/// * `col` - Column index of the target cell.
+/// * `seconds` - The duration of the sleep operation in seconds.
+///
+/// # Returns
+///
+/// The duration of the sleep operation.
 pub fn handle_sleep(row: i32, col: i32, seconds: i32) -> i32 {
     let tx = SLEEP_CHANNEL.0.clone();
     thread::spawn(move || {
@@ -505,6 +587,11 @@ pub fn handle_sleep(row: i32, col: i32, seconds: i32) -> i32 {
     seconds
 }
 
+/// Processes completed sleep operations and updates the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
 pub fn process_sleep_completions(sheet: &mut Spreadsheet) {
     if let Ok(rx) = SLEEP_CHANNEL.1.lock() {
         while let Ok((row, col, seconds)) = rx.try_recv() {
@@ -517,34 +604,64 @@ pub fn process_sleep_completions(sheet: &mut Spreadsheet) {
     }
 }
 
+/// Checks if a division by zero error exists for a specific cell.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rt` - Row index of the target cell.
+/// * `ct` - Column index of the target cell.
+///
+/// # Returns
+///
+/// `true` if a division by zero error exists, otherwise `false`.
 pub fn zero_div_err(sheet: &Spreadsheet, rt: i32, ct: i32) -> bool {
     let cell = &sheet.all_cells[rt as usize][ct as usize];
     if cell.operation_id == 6 && cell.precedents.len() == 2 {
         let (value, _) =
             get_operand_value(sheet, &sheet.all_cells[rt as usize][ct as usize].formula[1]);
-        if value == 0 {
-            return true;
-        } else {
-            return false;
-        }
+        value == 0
     } else {
         false
     }
 }
 
+/// Checks if any precedent of a specific cell has an error.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rt` - Row index of the target cell.
+/// * `ct` - Column index of the target cell.
+///
+/// # Returns
+///
+/// `true` if any precedent has an error, otherwise `false`.
 pub fn precedent_has_error(sheet: &Spreadsheet, rt: i32, ct: i32) -> bool {
     let precedents = &sheet.all_cells[rt as usize][ct as usize].precedents;
-    let mut i = 0;
+    let mut _i = 0;
     for cell in precedents {
-       let err = sheet.all_cells[cell.0.row as usize][cell.0.column as usize].is_error;
+        let err = sheet.all_cells[cell.row as usize][cell.column as usize].is_error;
         if err {
             return true;
-        } else {
         }
     }
     false
 }
 
+/// Performs a depth-first search to detect cycles in the dependency graph.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `rs` - Row index of the starting cell.
+/// * `cs` - Column index of the starting cell.
+/// * `visited` - A mutable reference to the set of visited cells.
+/// * `recursion_stack` - A mutable reference to the recursion stack.
+///
+/// # Returns
+///
+/// `true` if a cycle is detected, otherwise `false`.
 pub fn dfs_cycle_detection(
     sheet: &Spreadsheet,
     rs: i32,
@@ -566,7 +683,7 @@ pub fn dfs_cycle_detection(
 
     let curr_cell = &sheet.all_cells[rs as usize][cs as usize];
 
-    for (dependent, _) in &curr_cell.dependents {
+    for dependent in &curr_cell.dependents {
         if dfs_cycle_detection(
             sheet,
             dependent.row,
@@ -578,34 +695,46 @@ pub fn dfs_cycle_detection(
         }
     }
 
-    recursion_stack.remove(&cell_coord);                                        
-    
+    recursion_stack.remove(&cell_coord);
 
     false
 }
 
+/// Checks if a cycle exists in the dependency graph for a specific cell.
+///
+/// # Arguments
+///
+/// * `sheet` - A reference to the spreadsheet.
+/// * `row` - Row index of the target cell.
+/// * `col` - Column index of the target cell.
+///
+/// # Returns
+///
+/// `true` if a cycle exists, otherwise `false`.
 pub fn has_cycle(sheet: &Spreadsheet, row: i32, col: i32) -> bool {
     let mut visited: HashSet<(i32, i32)> = HashSet::new();
     let mut recursion_stack: HashSet<(i32, i32)> = HashSet::new();
     dfs_cycle_detection(sheet, row, col, &mut visited, &mut recursion_stack)
 }
 
+/// Recalculates the values of all dependents of a specific cell.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rs` - Row index of the starting cell.
+/// * `cs` - Column index of the starting cell.
 pub fn recalculate_dependents(sheet: &mut Spreadsheet, rs: i32, cs: i32) {
     let mut q: VecDeque<(i32, i32)> = VecDeque::new();
     {
         let cell = &sheet.all_cells[rs as usize][cs as usize];
-        for (dependents, _) in &cell.dependents {
+        for dependents in &cell.dependents {
             q.push_back((dependents.row, dependents.column));
         }
     }
 
     while let Some((curr_r, curr_c)) = q.pop_front() {
-        if zero_div_err(sheet, curr_r, curr_c) {
-            sheet.all_cells[curr_r as usize][curr_c as usize].is_error = true;
-            unsafe {
-                STATUS = 2;
-            }
-        } else if precedent_has_error(sheet, curr_r, curr_c) {
+        if zero_div_err(sheet, curr_r, curr_c) || precedent_has_error(sheet, curr_r, curr_c) {
             sheet.all_cells[curr_r as usize][curr_c as usize].is_error = true;
             unsafe {
                 STATUS = 2;
@@ -615,12 +744,21 @@ pub fn recalculate_dependents(sheet: &mut Spreadsheet, rs: i32, cs: i32) {
         }
 
         let curr_cell = &sheet.all_cells[curr_r as usize][curr_c as usize];
-        for (dep_ref, _) in &curr_cell.dependents {
+        for dep_ref in &curr_cell.dependents {
             q.push_back((dep_ref.row, dep_ref.column));
         }
     }
 }
 
+/// Assigns a formula and operation to a specific cell in the spreadsheet.
+///
+/// # Arguments
+///
+/// * `sheet` - A mutable reference to the spreadsheet.
+/// * `rt` - Row index of the target cell.
+/// * `ct` - Column index of the target cell.
+/// * `operation_id` - The operation ID to assign.
+/// * `formula` - A vector of operands representing the formula.
 pub fn assign_cell(
     sheet: &mut Spreadsheet,
     rt: i32,
@@ -628,7 +766,7 @@ pub fn assign_cell(
     operation_id: i32,
     formula: Vec<Operand>,
 ) {
-    let temp_precedents: HashMap<CellReference, bool>;
+    let temp_precedents: HashSet<CellReference>;
 
     {
         let target_cell = &mut sheet.all_cells[rt as usize][ct as usize];
@@ -636,7 +774,7 @@ pub fn assign_cell(
     }
     //dependents of target_cell do not change
     //precedents will be cleared
-    for (cell_ref, _) in &temp_precedents {
+    for cell_ref in &temp_precedents {
         delete_dependency(sheet, cell_ref.row, cell_ref.column, rt, ct);
     }
     clear_precedents(sheet, rt, ct);
@@ -669,7 +807,7 @@ pub fn assign_cell(
         sheet.all_cells[rt as usize][ct as usize].operation_id = operation_id;
         sheet.all_cells[rt as usize][ct as usize].formula = temp_formula.clone();
 
-        for (old_precedent, _) in &temp_precedents {
+        for old_precedent in &temp_precedents {
             add_dependency(sheet, old_precedent.row, old_precedent.column, rt, ct);
         }
         for new_precedent in &temp_formula {

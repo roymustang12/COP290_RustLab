@@ -1,5 +1,4 @@
 use crate::cellsp::CellReference;
-use std::str;
 
 /// Represents an expression in the spreadsheet.
 ///

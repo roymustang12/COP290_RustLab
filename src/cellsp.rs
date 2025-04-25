@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use::std::fmt;
 use crate::display::get_column_name;
+use ::std::fmt;
+use std::collections::HashMap;
 
 /// Represents an operand in a formula.
 ///
@@ -26,7 +26,7 @@ pub struct CellReference {
 
 impl fmt::Display for CellReference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let col_name = get_column_name(self.column as i32); // Convert column index to name (e.g., 0 -> A)
+        let col_name = get_column_name(self.column); // Convert column index to name (e.g., 0 -> A)
         write!(f, "{}{}", col_name, self.row + 1) // Convert row index to 1-based and format as A1, B2, etc.
     }
 }
