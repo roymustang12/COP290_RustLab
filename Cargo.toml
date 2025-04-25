@@ -3,14 +3,27 @@ name = "rust_lab"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["main1"] # Enable main1 by default
+main1 = ["lazy_static"] # Feature for main1 functionality
+main2 = ["chrono", "csv", "fltk", "plotters", "lalrpop-util", "regex","lalrpop", "lazy_static"] # Feature for main2 functionality
+
 [build-dependencies]
-lalrpop = "0.22.1"
+lalrpop = { version = "0.22.1", optional = true } # Make lalrpop optional
+
 
 [dependencies]
+# Dependencies used in main2
+chrono = { version = "0.4", optional = true }
+csv = { version = "1.2", optional = true }
+fltk = { version = "1.5", optional = true, features = ["fltk-bundled"] }
+plotters = { version = "0.3.4", optional = true }
+lalrpop-util = { version = "0.22.1", optional = true, features = ["lexer", "unicode"] }
+regex = { version = "1", optional = true }
 
-plotters = "0.3.4"
-lazy_static = "1.5.0"
-lalrpop-util = { version = "0.22.1", features = ["lexer", "unicode"] }
-regex = "1"
-csv = "1.2"
-fltk = { version = "^1.5", features = ["fltk-bundled"] }
+# Dependency used in main1
+lazy_static = { version = "1.5.0", optional = true }
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
